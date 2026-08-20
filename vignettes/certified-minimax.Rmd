@@ -1,0 +1,137 @@
+---
+title: "Certified minimax approximation of the logistic-normal integral"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Certified minimax approximation}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+## Overview
+
+The logistic-normal integral
+\[
+I(\eta, v) \;=\; E[\Lambda(Y)], \quad Y \sim N(\eta, v)
+\]
+has no exact closed form. The `LogisNormIntegral` package approximates
+it via a certified K-term minimax mixture. Three families of certificate ship,
+selectable through the `K` argument: the strict, proved-optimal constants for
+\(K = 1, \ldots, 11\), the relaxed Bernstein--Akhiezer certificates at
+\(K = 14, \ldots, 17\), and the signed \(K = 22\) frontier carrying the best
+certified bound \(\Delta = 3.6 \times 10^{-15}\). A Bernstein--Akhiezer
+certificate exhibits at least \(K + 1\) dominant critical points of the error,
+strictly alternating at level at least \(0.9\) of its supremum (at least \(K\)
+for the BA-\(K\) form at \(K = 17\)), relaxing the strict
+\(2K\)-equioscillation of the certified minimax. In every case
+\[
+I(\eta, v) \;\approx\; \sum_{i=1}^K w_i^\star
+  \Phi\!\left( \frac{s_i^\star \eta}{\sqrt{1 + s_i^{\star 2} v}} \right),
+\]
+with absolute error bounded by \(\Delta_K^\star\) (certified).
+
+## Loading the package
+
+```{r}
+library(LogisNormIntegral)
+```
+
+## Accessing the certified constants
+
+```{r}
+minimax_weights(8)
+minimax_scales(8)
+minimax_error(8)    # 2.1e-9
+```
+
+## Worked example: a treatment-contrast grid
+
+A mediation analysis calls for evaluating \(I(\eta, v)\) at a grid of
+\((\eta, v)\) pairs for the treatment-contrast distribution.
+
+```{r}
+eta_values <- c(-0.2, 0.0, 0.3, 0.7, 1.2)
+v_values <- c(0.01, 0.1, 0.5)
+
+# Evaluate with K = 8 (largest M&S-tabulated order)
+results_K8 <- outer(eta_values, v_values,
+                    Vectorize(function(e, v) logistic_normal_integral(e, v, K = 8)))
+results_K8 <- `dimnames<-`(results_K8, list(paste0("eta=", eta_values),
+                                           paste0("v=", v_values)))
+results_K8
+```
+
+## Error bound
+
+The package's error-bound guarantee is uniform:
+
+```{r}
+K_range <- 1:11
+delta_K <- vapply(K_range, minimax_error, numeric(1))
+data.frame(K = K_range, Delta_star = delta_K)
+```
+
+## Higher precision via K = 10
+
+```{r}
+logistic_normal_integral(0.5, 0.1, K = 10)   # max error 6.65e-11
+```
+
+## Best certified bound: the signed \(K = 22\) frontier
+
+`K = 22` gives the best certified bound, a signed-class mixture (one negative
+atom, weights still summing to one) certified at
+\(\Delta \le 3.605 \times 10^{-15}\), within a factor of about thirty-three of
+the IEEE double-precision unit roundoff \(2^{-53}\).
+
+```{r}
+logistic_normal_integral(0.5, 0.1, K = 22)      # signed frontier
+minimax_error(22)                               # 3.60e-15
+minimax_constants[["K22"]][["signed"]]          # TRUE (one negative atom)
+```
+
+## Cross-validation: mixture CDF at a point
+
+At \(z = 1\) with \(v = 0\), the integral reduces to the CDF:
+\(I(1, 0) = \Lambda(1) \approx 0.7311\).
+
+```{r}
+reference <- 1 / (1 + exp(-1))            # exact Lambda(1)
+approx_K8 <- phi_minimax_mixture(1, K = 8)
+approx_K10 <- phi_minimax_mixture(1, K = 10)
+c(exact = reference, K8 = approx_K8, K10 = approx_K10,
+  err_K8 = abs(reference - approx_K8),
+  err_K10 = abs(reference - approx_K10))
+```
+
+Both approximations are within their certified error bounds.
+
+## Theoretical foundation
+
+For \(K = 1, \ldots, 11\) the weights and scales are the certified
+global minimax, proved to equioscillate and to be the unique global
+minimiser via the varisolvency of the mixture family. Every certified tuple
+is independently checkable from the audit deposit in `inst/certs/`, whose
+README records the provenance and carries a verification snippet. (Monahan
+and Stefanski conjectured the equioscillation and computed the
+\(K \le 8\) values numerically.)
+
+The certified results in this strict regime:
+1. **Existence:** for every \(K \ge 1\) a minimiser exists in the closure of the
+   mixture family, and for \(K = 1, \ldots, 11\) it lies in the family itself,
+   with no vanishing weight and no coincident scales.
+2. **Equioscillation:** the error has exactly \(2K\) alternating
+   extrema on \((0, \infty)\) (proved).
+3. **Global minimality:** each certified solution is the unique global
+   minimax, via the varisolvency of the mixture family (its tangent space
+   is an exponential-sum Chebyshev system, so the best uniform
+   approximation is unique). This does not affect the certified error
+   bound, which the shipped mixture is directly verified to meet.
+
+Beyond \(K = 11\), the certified signed \(K = 22\) frontier attains
+\(\Delta = 3.604 \times 10^{-15}\) (one negative atom, \(\sum_i w_i = 1\)),
+within a factor of about thirty-three of the IEEE double-precision unit
+roundoff.

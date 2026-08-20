@@ -1,0 +1,306 @@
+Pirjol pointwise engine ENABLED (loop-bound fix of pull request 1 applied in memory).
+
+Part 1: pointwise accuracy at six (eta, v) configurations
+=========================================================================
+  - 'truth' = adaptive Gauss-Kronrod (`integrate`), cross-checked against
+    500-node Gauss-Hermite quadrature (agreement asserted to <= 1e-13).
+    The original 100-node GH reference had ~6e-11 error at v = 9, which
+    is larger than the K = 17 minimax bound Delta_17 = 2.5e-12 and would
+    thus measure the *reference's* error, not the minimax error.
+  - K = 8, 11, 17 are the minimax mixtures shipped with this package.
+  - MC M = 10^2, 10^4, 10^6 are i.i.d. Monte Carlo estimates of E_M[Lambda].
+
+  eta   v I_true   err_K8  err_K11  err_K17 err_MC1e2 err_MC1e4 err_MC1e6
+ -2.0 0.5  0.138 1.52e-12 8.33e-17 1.36e-14   0.00742  0.000529  7.62e-06
+  0.0 1.0  0.500 0.00e+00 1.11e-16 0.00e+00   0.00906  0.000544  9.67e-05
+  2.0 1.0  0.845 1.31e-14 1.11e-16 1.62e-14   0.00995  0.001475  2.68e-05
+ -1.0 4.0  0.352 2.78e-16 5.55e-17 4.11e-15   0.05523  0.000882  2.97e-04
+  1.0 4.0  0.648 3.33e-16 1.11e-16 4.00e-15   0.01603  0.000670  5.26e-06
+  0.5 9.0  0.557 5.55e-16 1.11e-16 5.44e-15   0.04525  0.004938  5.42e-04
+
+Reference bounds:
+  Delta_K^* (uniform)         : K =  8 -> 2.1e-09,  K = 11 -> 1.3e-11,  K = 17 -> 2.5e-12
+  MC std error ~ 1/sqrt(M)    : M = 1e2 -> 5e-2,    M = 1e4 -> 5e-3,    M = 1e6 -> 5e-4
+
+Part 2: quasi-Bayesian Monte Carlo for the Natural Indirect Effect (NIE)
+=========================================================================
+  Synthetic mediation data (n = 500): treat -> mediator -> binary outcome.
+  Generated from known true coefficients so we have two reference values:
+    NIE_pop:  population NIE from the true data-generating process
+              (high-precision quadrature on the true coefficients).
+    NIE_hat:  data-conditional NIE the QB methods should estimate
+              (high-precision quadrature on the fitted coefficients).
+  All QB methods evaluate the same NIE. Only the *inner* integral differs.
+  Three outcome-prevalence scenarios (theta_0 = -3, -1, 0) cover low,
+  moderate, and high marginal P(Y=1) (~0.38, 0.69, 0.82). The V&VW
+  remainder behaves differently in each regime because |Lambda^(4)|
+  depends on the linear predictor.
+
+--- Scenario: low      (theta_0 = -3.0)  (marginal P(Y=1) = 0.382) ---
+    NIE_pop = +0.389406  NIE_hat = +0.415604  |NIE_hat - NIE_pop| = 2.620e-02
+
+  N_qb = 100:
+    minimax K=22 (default)  NIE = +0.409197  CI = [+0.363506, +0.468923]  bias = -6.407e-03  time =  0.009s   (certified signed frontier, Delta_22 = 3.6e-15)
+    minimax K=17 (BA-K)     NIE = +0.409197  CI = [+0.363506, +0.468923]  bias = -6.407e-03  time =  0.007s   (certified, Delta_17 = 2.5e-12)
+    minimax K=11 (STRICT)   NIE = +0.409197  CI = [+0.363506, +0.468923]  bias = -6.407e-03  time =  0.000s   (certified, Delta_11 = 1.3e-11)
+    V&VW (Taylor 2nd ord)   NIE = +0.285167  CI = [+0.218762, +0.342257]  bias = -1.304e-01  time =  0.000s   (analytic, biased O(v^2))
+    inner MC, M = 1e3       NIE = +0.408305  CI = [+0.357909, +0.470899]  bias = -7.299e-03  time =  0.006s         1x slower
+    inner MC, M = 1e4       NIE = +0.409060  CI = [+0.364202, +0.470370]  bias = -6.544e-03  time =  0.051s         6x slower
+    Pirjol Poisson, n = 10  NIE = +0.409197  CI = [+0.363506, +0.468923]  bias = -6.407e-03  time =  0.020s   (pointwise, corrected loop bound)
+    Pirjol Poisson, n = 30  NIE = +0.409197  CI = [+0.363506, +0.468923]  bias = -6.407e-03  time =  0.005s   (pointwise, corrected loop bound)
+
+  N_qb = 1000:
+    minimax K=22 (default)  NIE = +0.410669  CI = [+0.342785, +0.470620]  bias = -4.936e-03  time =  0.001s   (certified signed frontier, Delta_22 = 3.6e-15)
+    minimax K=17 (BA-K)     NIE = +0.410669  CI = [+0.342785, +0.470620]  bias = -4.936e-03  time =  0.001s   (certified, Delta_17 = 2.5e-12)
+    minimax K=11 (STRICT)   NIE = +0.410669  CI = [+0.342785, +0.470620]  bias = -4.936e-03  time =  0.001s   (certified, Delta_11 = 1.3e-11)
+    V&VW (Taylor 2nd ord)   NIE = +0.282510  CI = [+0.194534, +0.347551]  bias = -1.331e-01  time =  0.000s   (analytic, biased O(v^2))
+    inner MC, M = 1e3       NIE = +0.410610  CI = [+0.337793, +0.478100]  bias = -4.994e-03  time =  0.056s        56x slower
+    inner MC, M = 1e4       NIE = +0.410726  CI = [+0.342047, +0.470557]  bias = -4.878e-03  time =  0.479s       479x slower
+    Pirjol Poisson, n = 10  NIE = +0.410669  CI = [+0.342785, +0.470620]  bias = -4.936e-03  time =  0.018s   (pointwise, corrected loop bound)
+    Pirjol Poisson, n = 30  NIE = +0.410669  CI = [+0.342785, +0.470620]  bias = -4.936e-03  time =  0.045s   (pointwise, corrected loop bound)
+
+  N_qb = 10000:
+    minimax K=22 (default)  NIE = +0.411232  CI = [+0.349110, +0.469513]  bias = -4.372e-03  time =  0.008s   (certified signed frontier, Delta_22 = 3.6e-15)
+    minimax K=17 (BA-K)     NIE = +0.411232  CI = [+0.349110, +0.469513]  bias = -4.372e-03  time =  0.007s   (certified, Delta_17 = 2.5e-12)
+    minimax K=11 (STRICT)   NIE = +0.411232  CI = [+0.349110, +0.469513]  bias = -4.372e-03  time =  0.006s   (certified, Delta_11 = 1.3e-11)
+    V&VW (Taylor 2nd ord)   NIE = +0.282749  CI = [+0.197278, +0.347326]  bias = -1.329e-01  time =  0.003s   (analytic, biased O(v^2))
+    inner MC, M = 1e3       NIE = +0.411295  CI = [+0.345830, +0.474638]  bias = -4.310e-03  time =  0.555s        69x slower
+    inner MC, M = 1e4       NIE = +0.411202  CI = [+0.348794, +0.469485]  bias = -4.402e-03  time =  4.776s       597x slower
+    Pirjol Poisson, n = 10  NIE = +0.411232  CI = [+0.349110, +0.469513]  bias = -4.372e-03  time =  0.173s   (pointwise, corrected loop bound)
+    Pirjol Poisson, n = 30  NIE = +0.411232  CI = [+0.349110, +0.469513]  bias = -4.372e-03  time =  0.433s   (pointwise, corrected loop bound)
+
+--- Scenario: moderate (theta_0 = -1.0)  (marginal P(Y=1) = 0.690) ---
+    NIE_pop = +0.304638  NIE_hat = +0.322715  |NIE_hat - NIE_pop| = 1.808e-02
+
+  N_qb = 100:
+    minimax K=22 (default)  NIE = +0.313346  CI = [+0.234606, +0.403923]  bias = -9.369e-03  time =  0.000s   (certified signed frontier, Delta_22 = 3.6e-15)
+    minimax K=17 (BA-K)     NIE = +0.313346  CI = [+0.234606, +0.403923]  bias = -9.369e-03  time =  0.000s   (certified, Delta_17 = 2.5e-12)
+    minimax K=11 (STRICT)   NIE = +0.313346  CI = [+0.234606, +0.403923]  bias = -9.369e-03  time =  0.000s   (certified, Delta_11 = 1.3e-11)
+    V&VW (Taylor 2nd ord)   NIE = +0.408646  CI = [+0.308863, +0.524997]  bias = +8.593e-02  time =  0.000s   (analytic, biased O(v^2))
+    inner MC, M = 1e3       NIE = +0.311834  CI = [+0.229236, +0.399013]  bias = -1.088e-02  time =  0.005s   >     5x slower (minimax below timer floor)
+    inner MC, M = 1e4       NIE = +0.313074  CI = [+0.232327, +0.405154]  bias = -9.641e-03  time =  0.049s   >    49x slower (minimax below timer floor)
+    Pirjol Poisson, n = 10  NIE = +0.313346  CI = [+0.234606, +0.403923]  bias = -9.369e-03  time =  0.002s   (pointwise, corrected loop bound)
+    Pirjol Poisson, n = 30  NIE = +0.313346  CI = [+0.234606, +0.403923]  bias = -9.369e-03  time =  0.004s   (pointwise, corrected loop bound)
+
+  N_qb = 1000:
+    minimax K=22 (default)  NIE = +0.317154  CI = [+0.215489, +0.400244]  bias = -5.561e-03  time =  0.001s   (certified signed frontier, Delta_22 = 3.6e-15)
+    minimax K=17 (BA-K)     NIE = +0.317154  CI = [+0.215489, +0.400244]  bias = -5.561e-03  time =  0.001s   (certified, Delta_17 = 2.5e-12)
+    minimax K=11 (STRICT)   NIE = +0.317154  CI = [+0.215489, +0.400244]  bias = -5.561e-03  time =  0.000s   (certified, Delta_11 = 1.3e-11)
+    V&VW (Taylor 2nd ord)   NIE = +0.416636  CI = [+0.250933, +0.563600]  bias = +9.392e-02  time =  0.000s   (analytic, biased O(v^2))
+    inner MC, M = 1e3       NIE = +0.316816  CI = [+0.211788, +0.402066]  bias = -5.899e-03  time =  0.054s        54x slower
+    inner MC, M = 1e4       NIE = +0.317140  CI = [+0.216890, +0.402932]  bias = -5.575e-03  time =  0.482s       482x slower
+    Pirjol Poisson, n = 10  NIE = +0.317154  CI = [+0.215489, +0.400244]  bias = -5.561e-03  time =  0.018s   (pointwise, corrected loop bound)
+    Pirjol Poisson, n = 30  NIE = +0.317154  CI = [+0.215489, +0.400244]  bias = -5.561e-03  time =  0.044s   (pointwise, corrected loop bound)
+
+  N_qb = 10000:
+    minimax K=22 (default)  NIE = +0.317820  CI = [+0.222652, +0.400425]  bias = -4.895e-03  time =  0.010s   (certified signed frontier, Delta_22 = 3.6e-15)
+    minimax K=17 (BA-K)     NIE = +0.317820  CI = [+0.222652, +0.400425]  bias = -4.895e-03  time =  0.009s   (certified, Delta_17 = 2.5e-12)
+    minimax K=11 (STRICT)   NIE = +0.317820  CI = [+0.222652, +0.400425]  bias = -4.895e-03  time =  0.006s   (certified, Delta_11 = 1.3e-11)
+    V&VW (Taylor 2nd ord)   NIE = +0.417410  CI = [+0.264824, +0.557227]  bias = +9.469e-02  time =  0.003s   (analytic, biased O(v^2))
+    inner MC, M = 1e3       NIE = +0.317795  CI = [+0.221684, +0.403504]  bias = -4.920e-03  time =  0.538s        54x slower
+    inner MC, M = 1e4       NIE = +0.317778  CI = [+0.222994, +0.400552]  bias = -4.938e-03  time =  4.783s       478x slower
+    Pirjol Poisson, n = 10  NIE = +0.317820  CI = [+0.222652, +0.400425]  bias = -4.895e-03  time =  0.171s   (pointwise, corrected loop bound)
+    Pirjol Poisson, n = 30  NIE = +0.317820  CI = [+0.222652, +0.400425]  bias = -4.895e-03  time =  0.429s   (pointwise, corrected loop bound)
+
+--- Scenario: high     (theta_0 =  0.0)  (marginal P(Y=1) = 0.820) ---
+    NIE_pop = +0.208563  NIE_hat = +0.247995  |NIE_hat - NIE_pop| = 3.943e-02
+
+  N_qb = 100:
+    minimax K=22 (default)  NIE = +0.240960  CI = [+0.166402, +0.325140]  bias = -7.035e-03  time =  0.001s   (certified signed frontier, Delta_22 = 3.6e-15)
+    minimax K=17 (BA-K)     NIE = +0.240960  CI = [+0.166402, +0.325140]  bias = -7.035e-03  time =  0.000s   (certified, Delta_17 = 2.5e-12)
+    minimax K=11 (STRICT)   NIE = +0.240960  CI = [+0.166402, +0.325140]  bias = -7.035e-03  time =  0.000s   (certified, Delta_11 = 1.3e-11)
+    V&VW (Taylor 2nd ord)   NIE = +0.471936  CI = [+0.163193, +1.012849]  bias = +2.239e-01  time =  0.000s   (analytic, biased O(v^2))
+    inner MC, M = 1e3       NIE = +0.239480  CI = [+0.172093, +0.315928]  bias = -8.515e-03  time =  0.006s   >     6x slower (minimax below timer floor)
+    inner MC, M = 1e4       NIE = +0.240540  CI = [+0.165900, +0.324993]  bias = -7.455e-03  time =  0.048s   >    48x slower (minimax below timer floor)
+    Pirjol Poisson, n = 10  NIE = +0.240960  CI = [+0.166402, +0.325140]  bias = -7.035e-03  time =  0.002s   (pointwise, corrected loop bound)
+    Pirjol Poisson, n = 30  NIE = +0.240960  CI = [+0.166402, +0.325140]  bias = -7.035e-03  time =  0.005s   (pointwise, corrected loop bound)
+
+  N_qb = 1000:
+    minimax K=22 (default)  NIE = +0.243090  CI = [+0.133979, +0.332148]  bias = -4.905e-03  time =  0.001s   (certified signed frontier, Delta_22 = 3.6e-15)
+    minimax K=17 (BA-K)     NIE = +0.243090  CI = [+0.133979, +0.332148]  bias = -4.905e-03  time =  0.002s   (certified, Delta_17 = 2.5e-12)
+    minimax K=11 (STRICT)   NIE = +0.243090  CI = [+0.133979, +0.332148]  bias = -4.905e-03  time =  0.001s   (certified, Delta_11 = 1.3e-11)
+    V&VW (Taylor 2nd ord)   NIE = +0.491152  CI = [+0.147263, +1.037523]  bias = +2.432e-01  time =  0.000s   (analytic, biased O(v^2))
+    inner MC, M = 1e3       NIE = +0.242692  CI = [+0.130268, +0.333014]  bias = -5.303e-03  time =  0.054s   >    54x slower (minimax below timer floor)
+    inner MC, M = 1e4       NIE = +0.243095  CI = [+0.133420, +0.334542]  bias = -4.901e-03  time =  0.482s   >   482x slower (minimax below timer floor)
+    Pirjol Poisson, n = 10  NIE = +0.243090  CI = [+0.133979, +0.332148]  bias = -4.905e-03  time =  0.019s   (pointwise, corrected loop bound)
+    Pirjol Poisson, n = 30  NIE = +0.243090  CI = [+0.133979, +0.332148]  bias = -4.905e-03  time =  0.043s   (pointwise, corrected loop bound)
+
+  N_qb = 10000:
+    minimax K=22 (default)  NIE = +0.243836  CI = [+0.143561, +0.331092]  bias = -4.159e-03  time =  0.012s   (certified signed frontier, Delta_22 = 3.6e-15)
+    minimax K=17 (BA-K)     NIE = +0.243836  CI = [+0.143561, +0.331092]  bias = -4.159e-03  time =  0.009s   (certified, Delta_17 = 2.5e-12)
+    minimax K=11 (STRICT)   NIE = +0.243836  CI = [+0.143561, +0.331092]  bias = -4.159e-03  time =  0.007s   (certified, Delta_11 = 1.3e-11)
+    V&VW (Taylor 2nd ord)   NIE = +0.493336  CI = [+0.155575, +1.061730]  bias = +2.453e-01  time =  0.003s   (analytic, biased O(v^2))
+    inner MC, M = 1e3       NIE = +0.243812  CI = [+0.142646, +0.331930]  bias = -4.184e-03  time =  0.543s        45x slower
+    inner MC, M = 1e4       NIE = +0.243785  CI = [+0.143819, +0.330775]  bias = -4.210e-03  time =  4.782s       399x slower
+    Pirjol Poisson, n = 10  NIE = +0.243905  CI = [+0.143751, +0.331093]  bias = -4.091e-03  time =  0.174s   (pointwise, corrected loop bound)  [UNDEFINED on 3 of 10000 draws, dropped]
+    Pirjol Poisson, n = 30  NIE = +0.243903  CI = [+0.143749, +0.331093]  bias = -4.092e-03  time =  0.425s   (pointwise, corrected loop bound)  [UNDEFINED on 4 of 10000 draws, dropped]
+
+=========================================================================
+Summary table  (bias_vs_hat = QB estimate - NIE_hat)
+
+                  scenario   py1  N_qb                 method     NIE   ci_lo
+ low      (theta_0 = -3.0) 0.382   100 minimax K=22 (default) 0.40920 0.36351
+ low      (theta_0 = -3.0) 0.382   100    minimax K=17 (BA-K) 0.40920 0.36351
+ low      (theta_0 = -3.0) 0.382   100  minimax K=11 (STRICT) 0.40920 0.36351
+ low      (theta_0 = -3.0) 0.382   100  V&VW (Taylor 2nd ord) 0.28517 0.21876
+ low      (theta_0 = -3.0) 0.382   100      inner MC, M = 1e3 0.40830 0.35791
+ low      (theta_0 = -3.0) 0.382   100      inner MC, M = 1e4 0.40906 0.36420
+ low      (theta_0 = -3.0) 0.382   100 Pirjol Poisson, n = 10 0.40920 0.36351
+ low      (theta_0 = -3.0) 0.382   100 Pirjol Poisson, n = 30 0.40920 0.36351
+ low      (theta_0 = -3.0) 0.382  1000 minimax K=22 (default) 0.41067 0.34278
+ low      (theta_0 = -3.0) 0.382  1000    minimax K=17 (BA-K) 0.41067 0.34278
+ low      (theta_0 = -3.0) 0.382  1000  minimax K=11 (STRICT) 0.41067 0.34278
+ low      (theta_0 = -3.0) 0.382  1000  V&VW (Taylor 2nd ord) 0.28251 0.19453
+ low      (theta_0 = -3.0) 0.382  1000      inner MC, M = 1e3 0.41061 0.33779
+ low      (theta_0 = -3.0) 0.382  1000      inner MC, M = 1e4 0.41073 0.34205
+ low      (theta_0 = -3.0) 0.382  1000 Pirjol Poisson, n = 10 0.41067 0.34278
+ low      (theta_0 = -3.0) 0.382  1000 Pirjol Poisson, n = 30 0.41067 0.34278
+ low      (theta_0 = -3.0) 0.382 10000 minimax K=22 (default) 0.41123 0.34911
+ low      (theta_0 = -3.0) 0.382 10000    minimax K=17 (BA-K) 0.41123 0.34911
+ low      (theta_0 = -3.0) 0.382 10000  minimax K=11 (STRICT) 0.41123 0.34911
+ low      (theta_0 = -3.0) 0.382 10000  V&VW (Taylor 2nd ord) 0.28275 0.19728
+ low      (theta_0 = -3.0) 0.382 10000      inner MC, M = 1e3 0.41129 0.34583
+ low      (theta_0 = -3.0) 0.382 10000      inner MC, M = 1e4 0.41120 0.34879
+ low      (theta_0 = -3.0) 0.382 10000 Pirjol Poisson, n = 10 0.41123 0.34911
+ low      (theta_0 = -3.0) 0.382 10000 Pirjol Poisson, n = 30 0.41123 0.34911
+ moderate (theta_0 = -1.0) 0.690   100 minimax K=22 (default) 0.31335 0.23461
+ moderate (theta_0 = -1.0) 0.690   100    minimax K=17 (BA-K) 0.31335 0.23461
+ moderate (theta_0 = -1.0) 0.690   100  minimax K=11 (STRICT) 0.31335 0.23461
+ moderate (theta_0 = -1.0) 0.690   100  V&VW (Taylor 2nd ord) 0.40865 0.30886
+ moderate (theta_0 = -1.0) 0.690   100      inner MC, M = 1e3 0.31183 0.22924
+ moderate (theta_0 = -1.0) 0.690   100      inner MC, M = 1e4 0.31307 0.23233
+ moderate (theta_0 = -1.0) 0.690   100 Pirjol Poisson, n = 10 0.31335 0.23461
+ moderate (theta_0 = -1.0) 0.690   100 Pirjol Poisson, n = 30 0.31335 0.23461
+ moderate (theta_0 = -1.0) 0.690  1000 minimax K=22 (default) 0.31715 0.21549
+ moderate (theta_0 = -1.0) 0.690  1000    minimax K=17 (BA-K) 0.31715 0.21549
+ moderate (theta_0 = -1.0) 0.690  1000  minimax K=11 (STRICT) 0.31715 0.21549
+ moderate (theta_0 = -1.0) 0.690  1000  V&VW (Taylor 2nd ord) 0.41664 0.25093
+ moderate (theta_0 = -1.0) 0.690  1000      inner MC, M = 1e3 0.31682 0.21179
+ moderate (theta_0 = -1.0) 0.690  1000      inner MC, M = 1e4 0.31714 0.21689
+ moderate (theta_0 = -1.0) 0.690  1000 Pirjol Poisson, n = 10 0.31715 0.21549
+ moderate (theta_0 = -1.0) 0.690  1000 Pirjol Poisson, n = 30 0.31715 0.21549
+ moderate (theta_0 = -1.0) 0.690 10000 minimax K=22 (default) 0.31782 0.22265
+ moderate (theta_0 = -1.0) 0.690 10000    minimax K=17 (BA-K) 0.31782 0.22265
+ moderate (theta_0 = -1.0) 0.690 10000  minimax K=11 (STRICT) 0.31782 0.22265
+ moderate (theta_0 = -1.0) 0.690 10000  V&VW (Taylor 2nd ord) 0.41741 0.26482
+ moderate (theta_0 = -1.0) 0.690 10000      inner MC, M = 1e3 0.31780 0.22168
+ moderate (theta_0 = -1.0) 0.690 10000      inner MC, M = 1e4 0.31778 0.22299
+ moderate (theta_0 = -1.0) 0.690 10000 Pirjol Poisson, n = 10 0.31782 0.22265
+ moderate (theta_0 = -1.0) 0.690 10000 Pirjol Poisson, n = 30 0.31782 0.22265
+ high     (theta_0 =  0.0) 0.820   100 minimax K=22 (default) 0.24096 0.16640
+ high     (theta_0 =  0.0) 0.820   100    minimax K=17 (BA-K) 0.24096 0.16640
+ high     (theta_0 =  0.0) 0.820   100  minimax K=11 (STRICT) 0.24096 0.16640
+ high     (theta_0 =  0.0) 0.820   100  V&VW (Taylor 2nd ord) 0.47194 0.16319
+ high     (theta_0 =  0.0) 0.820   100      inner MC, M = 1e3 0.23948 0.17209
+ high     (theta_0 =  0.0) 0.820   100      inner MC, M = 1e4 0.24054 0.16590
+ high     (theta_0 =  0.0) 0.820   100 Pirjol Poisson, n = 10 0.24096 0.16640
+ high     (theta_0 =  0.0) 0.820   100 Pirjol Poisson, n = 30 0.24096 0.16640
+ high     (theta_0 =  0.0) 0.820  1000 minimax K=22 (default) 0.24309 0.13398
+ high     (theta_0 =  0.0) 0.820  1000    minimax K=17 (BA-K) 0.24309 0.13398
+ high     (theta_0 =  0.0) 0.820  1000  minimax K=11 (STRICT) 0.24309 0.13398
+ high     (theta_0 =  0.0) 0.820  1000  V&VW (Taylor 2nd ord) 0.49115 0.14726
+ high     (theta_0 =  0.0) 0.820  1000      inner MC, M = 1e3 0.24269 0.13027
+ high     (theta_0 =  0.0) 0.820  1000      inner MC, M = 1e4 0.24309 0.13342
+ high     (theta_0 =  0.0) 0.820  1000 Pirjol Poisson, n = 10 0.24309 0.13398
+ high     (theta_0 =  0.0) 0.820  1000 Pirjol Poisson, n = 30 0.24309 0.13398
+ high     (theta_0 =  0.0) 0.820 10000 minimax K=22 (default) 0.24384 0.14356
+ high     (theta_0 =  0.0) 0.820 10000    minimax K=17 (BA-K) 0.24384 0.14356
+ high     (theta_0 =  0.0) 0.820 10000  minimax K=11 (STRICT) 0.24384 0.14356
+ high     (theta_0 =  0.0) 0.820 10000  V&VW (Taylor 2nd ord) 0.49334 0.15558
+ high     (theta_0 =  0.0) 0.820 10000      inner MC, M = 1e3 0.24381 0.14265
+ high     (theta_0 =  0.0) 0.820 10000      inner MC, M = 1e4 0.24379 0.14382
+ high     (theta_0 =  0.0) 0.820 10000 Pirjol Poisson, n = 10 0.24390 0.14375
+ high     (theta_0 =  0.0) 0.820 10000 Pirjol Poisson, n = 30 0.24390 0.14375
+   ci_hi bias_vs_hat ci_covers_hat time_s n_undefined
+ 0.46892  -0.0064069          TRUE  0.009           0
+ 0.46892  -0.0064069          TRUE  0.007           0
+ 0.46892  -0.0064069          TRUE  0.000           0
+ 0.34226  -0.1304369         FALSE  0.000           0
+ 0.47090  -0.0072993          TRUE  0.006           0
+ 0.47037  -0.0065442          TRUE  0.051           0
+ 0.46892  -0.0064069          TRUE  0.020           0
+ 0.46892  -0.0064069          TRUE  0.005           0
+ 0.47062  -0.0049356          TRUE  0.001           0
+ 0.47062  -0.0049356          TRUE  0.001           0
+ 0.47062  -0.0049356          TRUE  0.001           0
+ 0.34755  -0.1330942         FALSE  0.000           0
+ 0.47810  -0.0049942          TRUE  0.056           0
+ 0.47056  -0.0048782          TRUE  0.479           0
+ 0.47062  -0.0049356          TRUE  0.018           0
+ 0.47062  -0.0049356          TRUE  0.045           0
+ 0.46951  -0.0043721          TRUE  0.008           0
+ 0.46951  -0.0043721          TRUE  0.007           0
+ 0.46951  -0.0043721          TRUE  0.006           0
+ 0.34733  -0.1328551         FALSE  0.003           0
+ 0.47464  -0.0043097          TRUE  0.555           0
+ 0.46949  -0.0044021          TRUE  4.776           0
+ 0.46951  -0.0043721          TRUE  0.173           0
+ 0.46951  -0.0043721          TRUE  0.433           0
+ 0.40392  -0.0093688          TRUE  0.000           0
+ 0.40392  -0.0093688          TRUE  0.000           0
+ 0.40392  -0.0093688          TRUE  0.000           0
+ 0.52500   0.0859304          TRUE  0.000           0
+ 0.39901  -0.0108810          TRUE  0.005           0
+ 0.40515  -0.0096408          TRUE  0.049           0
+ 0.40392  -0.0093688          TRUE  0.002           0
+ 0.40392  -0.0093688          TRUE  0.004           0
+ 0.40024  -0.0055611          TRUE  0.001           0
+ 0.40024  -0.0055611          TRUE  0.001           0
+ 0.40024  -0.0055611          TRUE  0.000           0
+ 0.56360   0.0939211          TRUE  0.000           0
+ 0.40207  -0.0058995          TRUE  0.054           0
+ 0.40293  -0.0055749          TRUE  0.482           0
+ 0.40024  -0.0055611          TRUE  0.018           0
+ 0.40024  -0.0055611          TRUE  0.044           0
+ 0.40042  -0.0048952          TRUE  0.010           0
+ 0.40042  -0.0048952          TRUE  0.009           0
+ 0.40042  -0.0048952          TRUE  0.006           0
+ 0.55723   0.0946945          TRUE  0.003           0
+ 0.40350  -0.0049198          TRUE  0.538           0
+ 0.40055  -0.0049376          TRUE  4.783           0
+ 0.40042  -0.0048952          TRUE  0.171           0
+ 0.40042  -0.0048952          TRUE  0.429           0
+ 0.32514  -0.0070354          TRUE  0.001           0
+ 0.32514  -0.0070354          TRUE  0.000           0
+ 0.32514  -0.0070354          TRUE  0.000           0
+ 1.01285   0.2239410          TRUE  0.000           0
+ 0.31593  -0.0085149          TRUE  0.006           0
+ 0.32499  -0.0074554          TRUE  0.048           0
+ 0.32514  -0.0070354          TRUE  0.002           0
+ 0.32514  -0.0070354          TRUE  0.005           0
+ 0.33215  -0.0049050          TRUE  0.001           0
+ 0.33215  -0.0049050          TRUE  0.002           0
+ 0.33215  -0.0049050          TRUE  0.001           0
+ 1.03752   0.2431565          TRUE  0.000           0
+ 0.33301  -0.0053030          TRUE  0.054           0
+ 0.33454  -0.0049008          TRUE  0.482           0
+ 0.33215  -0.0049050          TRUE  0.019           0
+ 0.33215  -0.0049050          TRUE  0.043           0
+ 0.33109  -0.0041595          TRUE  0.012           0
+ 0.33109  -0.0041595          TRUE  0.009           0
+ 0.33109  -0.0041595          TRUE  0.007           0
+ 1.06173   0.2453410          TRUE  0.003           0
+ 0.33193  -0.0041837          TRUE  0.543           0
+ 0.33077  -0.0042101          TRUE  4.782           0
+ 0.33109  -0.0040908          TRUE  0.174           3
+ 0.33109  -0.0040919          TRUE  0.425           4
+
+Notes:
+  - All methods estimate NIE_hat (the data-conditional posterior target).
+  - 'bias_vs_hat' = QB posterior mean - NIE_hat.
+      * Minimax K = 22, 17, 11: inner-integral error is bounded by each
+        Delta_K^* (3.6e-15 to 1.3e-11), invisible against QB outer noise.
+      * V&VW: O(v^2) Taylor bias that does not vanish with N_qb.
+      * Inner MC: O(sigma_Lambda / sqrt(M_inner)) noise per draw, which
+        averages out as N_qb -> infty but inflates CI width at small M_inner.
+  - All three minimax variants (K = 22, 17, 11) agree to >= 10 decimals
+    everywhere, so the cert hierarchy is below QB sampling resolution.
+  - The V&VW Taylor bias is regime-dependent, flipping sign from negative
+    at low prevalence to positive at moderate and high, and largest in
+    magnitude at high outcome prevalence.
+  - For interactive use with N_qb >= 10^4 outer draws, the certified
+    minimax mixture is the only practical choice. It is as fast as V&VW
+    but unbiased, and more than 380x faster than inner MC at M_inner = 10^4.
+    That figure is a floor against the K = 22 default, this script's
+    timing reference. The measured ratios in this run are 597x, 478x,
+    and 399x, so quote the floor as a floor.

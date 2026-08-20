@@ -1,0 +1,39 @@
+Package: LogisNormIntegral
+Title: Certified Minimax Approximation of the Logistic-Normal Integral
+Version: 0.2.7
+Authors@R:
+    person("Ruijie", "Li", , "ruijie@leefy.net",
+           role = c("aut", "cre"))
+Description: Evaluate the logistic-normal integral, the expectation of a
+    logistic sigmoid under a Gaussian argument, via certified K-term minimax
+    normal-scale mixture approximations for K = 1, ..., 11, relaxed
+    Bernstein-Akhiezer certificates at K = 14 to 17, and a certified
+    signed K = 22 frontier (Delta = 3.6e-15), with error guaranteed below a
+    certified bound Delta_K*. The normal-scale-mixture approximation follows
+    Monahan and Stefanski (1992, ISBN:9780824785871), resting on the exact
+    scale-mixture representation of the logistic distribution given by Andrews
+    and Mallows (1974) <doi:10.1111/j.2517-6161.1974.tb00989.x> and Stefanski
+    (1991) <doi:10.1016/0167-7152(91)90181-P>. Weights and scales for
+    K = 1, ..., 11 are the certified global minimax, with equioscillation and
+    global uniqueness proved via varisolvency (see the package vignette).
+    Also provides asymptotic series, from the duality with the Mordell
+    integrals of Zwegers (2002) <doi:10.48550/arXiv.0807.4834>, for analytical
+    work in small- and large-variance regimes.
+License: AGPL-3
+URL: https://github.com/li-ruijie/LogisNormIntegral
+BugReports: https://github.com/li-ruijie/LogisNormIntegral/issues
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+LazyData: true
+Depends:
+    R (>= 3.5.0)
+Imports:
+    stats
+Suggests:
+    knitr,
+    rmarkdown,
+    testthat (>= 3.0.0),
+    statmod
+VignetteBuilder: knitr
+Config/testthat/edition: 3
+Config/roxygen2/version: 8.1.0
