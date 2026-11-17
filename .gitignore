@@ -1,0 +1,25 @@
+# Secrets
+.env
+.env.*
+
+# Vim swap and undo files
+*~
+*.swp
+*.swo
+*.un~
+
+# Backup and tool directories
+.vbak/
+.asst/
+.claude/
+.devc-scripts/
+.devcontainer/
+
+# R session and build artifacts
+.Rproj.user/
+.Rhistory
+.RData
+.Ruserdata
+*.Rproj
+*.Rcheck/
+*.tar.gz
