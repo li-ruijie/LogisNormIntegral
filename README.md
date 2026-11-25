@@ -64,7 +64,7 @@ GitHub:
 
 ```r
 # install.packages("remotes")
-remotes::install_github("li-ruijie/LogisNormIntegral@v0.2.5")
+remotes::install_github("li-ruijie/LogisNormIntegral@v0.2.10")
 ```
 
 Every [release](https://github.com/li-ruijie/LogisNormIntegral/releases) also carries a
@@ -72,7 +72,7 @@ pre-built source tarball, installable without any build tools:
 
 ```r
 install.packages(
-  "https://github.com/li-ruijie/LogisNormIntegral/releases/download/v0.2.9/LogisNormIntegral_0.2.9.tar.gz",
+  "https://github.com/li-ruijie/LogisNormIntegral/releases/download/v0.2.10/LogisNormIntegral_0.2.10.tar.gz",
   repos = NULL, type = "source")
 ```
 
@@ -181,7 +181,10 @@ results:
 vignette("certified-minimax", package = "LogisNormIntegral")
 ```
 
-Its source is `vignettes/certified-minimax.Rmd`.
+Its source is `vignettes/certified-minimax.Rmd`. The proofs, the certification algorithm, and
+the numerical results are given in full in the accompanying preprint, Li (2026),
+"Certified minimax normal-scale mixtures for the logistic-normal integral",
+[arXiv:2611.32270](https://arxiv.org/abs/2611.32270).
 
 ## License
 

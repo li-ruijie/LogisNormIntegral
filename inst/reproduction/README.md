@@ -1,7 +1,8 @@
 # Manuscript reproduction scripts
 
 Each script regenerates one artifact (table or figure) of the accompanying
-manuscript from the cert data shipped with the package.
+manuscript, Li (2026), [arXiv:2611.32270](https://arxiv.org/abs/2611.32270),
+from the cert data shipped with the package.
 
 ## Scripts
 

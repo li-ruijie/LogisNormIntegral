@@ -1,6 +1,6 @@
 Package: LogisNormIntegral
 Title: Certified Minimax Approximation of the Logistic-Normal Integral
-Version: 0.2.9
+Version: 0.2.10
 Authors@R:
     person("Ruijie", "Li", , "ruijie@leefy.net",
            role = c("aut", "cre"))
@@ -15,7 +15,8 @@ Description: Evaluate the logistic-normal integral, the expectation of a
     and Mallows (1974) <doi:10.1111/j.2517-6161.1974.tb00989.x> and Stefanski
     (1991) <doi:10.1016/0167-7152(91)90181-P>. Weights and scales for
     K = 1, ..., 11 are the certified global minimax, with equioscillation and
-    global uniqueness proved via varisolvency (see the package vignette).
+    global uniqueness proved via varisolvency, as set out in Li (2026)
+    <doi:10.48550/arXiv.2611.32270> and the package vignette.
     Also provides asymptotic series, from the duality with the Mordell
     integrals of Zwegers (2002) <doi:10.48550/arXiv.0807.4834>, for analytical
     work in small- and large-variance regimes.

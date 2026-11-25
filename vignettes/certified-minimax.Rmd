@@ -139,7 +139,10 @@ minimiser via the varisolvency of the mixture family. Every certified tuple
 is independently checkable from the audit deposit in `inst/certs/`, whose
 README records the provenance and carries a verification snippet. (Monahan
 and Stefanski conjectured the equioscillation and computed the
-\(K \le 8\) values numerically.)
+\(K \le 8\) values numerically.) The proofs, the certification algorithm,
+and the numerical results are given in full in the accompanying preprint,
+Li (2026), "Certified minimax normal-scale mixtures for the logistic-normal
+integral", [arXiv:2611.32270](https://arxiv.org/abs/2611.32270).
 
 The certified results in this strict regime:
 1. **Existence:** for every \(K \ge 1\) a minimiser exists in the closure of the
