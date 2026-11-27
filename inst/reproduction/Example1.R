@@ -41,19 +41,33 @@
 ## inner integral, and the comparison below holds the QB outer loop fixed and
 ## swaps the inner integral.
 ##
-## Six inner-integral methods:
+## Seven inner-integral methods:
 ##   (A) Minimax mixture, K = 22 (signed frontier, the package default, Delta = 3.6e-15). Analytic.
 ##   (B) Minimax mixture, K = 17 (BA-K cert, Delta = 2.5e-12). Analytic.
 ##   (C) Minimax mixture, K = 11 (STRICT cert, Delta = 1.3e-11). Analytic.
-##   (D) Valeri-VanderWeele (2013) 2nd-order Taylor. Analytic, biased O(v^2).
-##   (E) Inner Monte Carlo with M_inner = 10^3. Sample-based, noisy.
-##   (F) Inner Monte Carlo with M_inner = 10^4. Sample-based, tighter.
+##   (D) Gauss-Hermite quadrature with 30 fixed nodes. Deterministic, no error bound.
+##   (E) One-term probit, pnorm(x / 1.6) for the logistic function. Analytic, approximate.
+##   (F) Inner Monte Carlo with M_inner = 10^3. Sample-based, noisy.
+##   (G) Inner Monte Carlo with M_inner = 10^4. Sample-based, tighter.
 ##
-## Run under three outcome-prevalence scenarios (theta_0 = -3, -1, 0) so that
-## the V&VW vs minimax bias / coverage comparison spans low, moderate, and
-## high marginal outcome rates (P(Y=1) ~ 0.38, 0.69, 0.82). Note: none of
-## these is "rare" in the standard epidemiological sense (P <= 0.10). They
-## span the regime where |Lambda^(4)| is non-trivial.
+## Run under three outcome-prevalence scenarios (theta_0 = -3, -1, 0), with
+## low, moderate, and high marginal outcome rates (P(Y=1) ~ 0.38, 0.69,
+## 0.82). None of these is "rare" in the standard epidemiological sense
+## (P <= 0.10).
+##
+## Part 3 compares the NIE on the odds-ratio scale with the closed form of
+## Valeri and VanderWeele (2013), following VanderWeele and Vansteelandt
+## (2010). That form assumes a rare outcome, under which the logit is close
+## to the log and the expectation over the normal mediator is a moment
+## generating function, and gives
+##
+##   OR_NIE = exp{ (theta_M + theta_TM * z) * gamma_T * (1 - 0) }.
+##
+## It is the method of their SAS and SPSS macros and of the R package
+## regmedint. It involves no evaluation of the integral, so it is compared
+## on the scale it reports, against the exact odds ratio from the certified
+## mixture, at the true coefficients across the intercept, across the
+## strength of the mediator, and on the three fitted data sets.
 ##
 ## R style: 4-space indentation, Map/Reduce/Filter instead of for-loops,
 ## `[[` instead of `$`, base pipe `|>`, functional replacement forms.
@@ -257,30 +271,36 @@ cat("    NIE_hat:  data-conditional NIE the QB methods should estimate\n")
 cat("              (high-precision quadrature on the fitted coefficients).\n")
 cat("  All QB methods evaluate the same NIE. Only the *inner* integral differs.\n")
 cat("  Three outcome-prevalence scenarios (theta_0 = -3, -1, 0) cover low,\n")
-cat("  moderate, and high marginal P(Y=1) (~0.38, 0.69, 0.82). The V&VW\n")
-cat("  remainder behaves differently in each regime because |Lambda^(4)|\n")
-cat("  depends on the linear predictor.\n\n")
+cat("  moderate, and high marginal P(Y=1) (~0.38, 0.69, 0.82).\n\n")
 
 ## Ground-truth NIE at covar = 0, contrast z = 1, z' : 0 -> 1. Uses
 ## `reference_integral` (adaptive Gauss-Kronrod cross-checked against 500-node
 ## Gauss-Hermite). See the Part 1 header for why this replaces the previous
 ## 100-node GH reference.
-nie_via_reference <- function(theta_0, theta_T, theta_M, theta_TM, theta_C,
-                              gamma_0, gamma_T, gamma_C, sigma_M,
-                              z = 1, covar_val = 0) {
+potential_means_via_reference <- function(theta_0, theta_T, theta_M, theta_TM, theta_C,
+                                          gamma_0, gamma_T, gamma_C, sigma_M,
+                                          z = 1, covar_val = 0) {
     alpha_1 <- theta_0 + theta_T * z + theta_C * covar_val
     beta_M  <- theta_M + theta_TM * z
     mu_M1   <- gamma_0 + gamma_T * 1 + gamma_C * covar_val
     mu_M0   <- gamma_0 + gamma_T * 0 + gamma_C * covar_val
     v_inner <- beta_M^2 * sigma_M^2
-    reference_integral(alpha_1 + beta_M * mu_M1, v_inner) -
-        reference_integral(alpha_1 + beta_M * mu_M0, v_inner)
+    c(Y_11 = reference_integral(alpha_1 + beta_M * mu_M1, v_inner),
+      Y_10 = reference_integral(alpha_1 + beta_M * mu_M0, v_inner))
+}
+nie_via_reference <- function(...) {
+    p <- potential_means_via_reference(...)
+    p[["Y_11"]] - p[["Y_10"]]
+}
+odds <- function(p) p / (1 - p)
+## The NIE on the odds-ratio scale, exact.
+nie_or_via_reference <- function(...) {
+    p <- potential_means_via_reference(...)
+    odds(p[["Y_11"]]) / odds(p[["Y_10"]])
 }
 
 ## Scenario labels are relative among the three settings here. None is
-## "rare" in the strict epidemiological sense (P(Y=1) <= 0.1). They span
-## the prevalence range over which the V&VW Taylor remainder is largest
-## in magnitude.
+## "rare" in the strict epidemiological sense (P(Y=1) <= 0.1).
 scenarios <- list(
     list(name = "low      (theta_0 = -3.0)", theta_0 = -3.0),
     list(name = "moderate (theta_0 = -1.0)", theta_0 = -1.0),
@@ -303,14 +323,21 @@ inner_eval <- function(eta_11, eta_10, v_both, method) {
             Y_11 = LogisNormIntegral::logistic_normal_integral(eta_11, v_both, K = K),
             Y_10 = LogisNormIntegral::logistic_normal_integral(eta_10, v_both, K = K)
         )
-    } else if (identical(tp, "vvw")) {
-        ## V&VW: 2nd-order Taylor of E[Lambda(eta + sqrt(v) Z)] around v = 0:
-        ##   I(eta, v) ~ Lambda(eta) + 0.5 v Lambda''(eta)
-        ## where Lambda''(eta) = Lambda(eta) (1 - Lambda(eta)) (1 - 2 Lambda(eta)).
-        lam2 <- function(z) plogis(z) * (1 - plogis(z)) * (1 - 2 * plogis(z))
+    } else if (identical(tp, "gh")) {
+        ## Fixed-node Gauss-Hermite quadrature against the standard normal law.
+        rule <- statmod::gauss.quad.prob(method[["nodes"]], dist = "normal")
+        gh   <- function(eta) {
+            Reduce(function(acc, j) {
+                acc + rule[["weights"]][[j]] * plogis(eta + sqrt(v_both) * rule[["nodes"]][[j]])
+            }, seq_along(rule[["nodes"]]), 0)
+        }
+        list(Y_11 = gh(eta_11), Y_10 = gh(eta_10))
+    } else if (identical(tp, "probit")) {
+        ## One normal distribution function in place of the logistic function,
+        ## pnorm(x / 1.6), as in Gaynor, Schwartz, and Lin (2019).
         list(
-            Y_11 = plogis(eta_11) + 0.5 * v_both * lam2(eta_11),
-            Y_10 = plogis(eta_10) + 0.5 * v_both * lam2(eta_10)
+            Y_11 = pnorm(eta_11 / sqrt(1.6^2 + v_both)),
+            Y_10 = pnorm(eta_10 / sqrt(1.6^2 + v_both))
         )
     } else if (identical(tp, "mc")) {
         M_inner <- method[["M"]]
@@ -336,7 +363,9 @@ inner_eval <- function(eta_11, eta_10, v_both, method) {
 
 ## QB NIE for one (fit, method, N_qb, seed). `fit` is a list bundling the
 ## fitted coefficients and covariance matrices for the current scenario.
-compute_NIE_for_fit <- function(fit, N_qb, method, seed = 1L) {
+## Quasi-Bayesian parameter draws for one fit, reduced to the arguments of the
+## two integrals. Sets the seed, so every caller sees the same draws.
+qb_arguments <- function(fit, N_qb, seed) {
     set.seed(seed)
     theta_draws       <- rmvnorm_chol(N_qb, fit[["theta_hat"]], fit[["V_theta"]])
     gamma_draws       <- rmvnorm_chol(N_qb, fit[["gamma_hat"]], fit[["V_gamma"]])
@@ -352,11 +381,18 @@ compute_NIE_for_fit <- function(fit, N_qb, method, seed = 1L) {
     ##   (Intercept), treat, mediator, covar, treat:mediator
     alpha_1 <- as.numeric(theta_draws %*% c(1, z, 0, covar_val, 0))
     beta_M  <- theta_draws[, "mediator"] + z * theta_draws[, "treat:mediator"]
-    eta_11  <- alpha_1 + beta_M * mu_M1
-    eta_10  <- alpha_1 + beta_M * mu_M0
-    v_both  <- beta_M^2 * sigma_M_sq_draws
+    list(
+        eta_11  = alpha_1 + beta_M * mu_M1,
+        eta_10  = alpha_1 + beta_M * mu_M0,
+        v_both  = beta_M^2 * sigma_M_sq_draws,
+        beta_M  = beta_M,
+        gamma_T = gamma_draws[, "treat"]
+    )
+}
 
-    yy  <- inner_eval(eta_11, eta_10, v_both, method)
+compute_NIE_for_fit <- function(fit, N_qb, method, seed = 1L) {
+    args <- qb_arguments(fit, N_qb, seed)
+    yy   <- inner_eval(args[["eta_11"]], args[["eta_10"]], args[["v_both"]], method)
     NIE <- yy[["Y_11"]] - yy[["Y_10"]]
 
     ## An inner engine may fail to return a number on some draws. Pirjol's
@@ -373,8 +409,8 @@ compute_NIE_for_fit <- function(fit, N_qb, method, seed = 1L) {
     ## sampled variance of the regime, v = 56.5, the only draw above the lower
     ## edge on which the order-30 evaluator failed. Drop those draws, report how
     ## many, and continue, so one undefined draw does not abort the whole
-    ## interval. The certified mixture and the Taylor expansion are finite for
-    ## every argument, so this affects only the pointwise route.
+    ## interval. The certified mixture is finite for every argument, so this
+    ## affects only the pointwise route.
     ok      <- is.finite(NIE)
     n_bad   <- sum(!ok)
     if (n_bad == length(NIE)) {
@@ -427,9 +463,26 @@ fit_scenario <- function(scn) {
         gamma_hat[["covar"]],       sigma_M_hat
     )
 
+    reference_at <- function(f, theta_0, pars_theta, pars_gamma, sigma_M) {
+        f(theta_0, pars_theta[[1L]], pars_theta[[2L]], pars_theta[[3L]], pars_theta[[4L]],
+          pars_gamma[[1L]], pars_gamma[[2L]], pars_gamma[[3L]], sigma_M)
+    }
+    true_theta <- common_pars[c("theta_T", "theta_M", "theta_TM", "theta_C")]
+    true_gamma <- common_pars[c("gamma_0", "gamma_T", "gamma_C")]
+    hat_theta  <- theta_hat[c("treat", "mediator", "treat:mediator", "covar")]
+    hat_gamma  <- gamma_hat[c("(Intercept)", "treat", "covar")]
+
     list(
         scenario    = scn[["name"]],
         py1         = py1,
+        OR_pop      = reference_at(nie_or_via_reference, scn[["theta_0"]], true_theta,
+                                   true_gamma, common_pars[["sigma_M"]]),
+        OR_hat      = reference_at(nie_or_via_reference, theta_hat[["(Intercept)"]],
+                                   hat_theta, hat_gamma, sigma_M_hat),
+        OR_rare_pop = exp((common_pars[["theta_M"]] + common_pars[["theta_TM"]]) *
+                              common_pars[["gamma_T"]]),
+        OR_rare_hat = exp((theta_hat[["mediator"]] + theta_hat[["treat:mediator"]]) *
+                              gamma_hat[["treat"]]),
         theta_hat   = theta_hat,
         V_theta     = vcov(mod_y),
         gamma_hat   = gamma_hat,
@@ -441,7 +494,7 @@ fit_scenario <- function(scn) {
     )
 }
 
-## Six methods kept in a list so the inner loop is Map.
+## Seven methods kept in a list so the inner loop is Map.
 methods <- list(
     list(label = "minimax K=22 (default)",
          note  = "(certified signed frontier, Delta_22 = 3.6e-15)",
@@ -452,9 +505,12 @@ methods <- list(
     list(label = "minimax K=11 (STRICT)",
          note  = "(certified, Delta_11 = 1.3e-11)",
          spec  = list(type = "mixture", K = 11L)),
-    list(label = "V&VW (Taylor 2nd ord)",
-         note  = "(analytic, biased O(v^2))",
-         spec  = list(type = "vvw")),
+    list(label = "Gauss-Hermite, 30 nodes",
+         note  = "(fixed rule, no error bound)",
+         spec  = list(type = "gh", nodes = 30L)),
+    list(label = "probit, one term",
+         note  = "(Gaynor, Schwartz, and Lin 2019)",
+         spec  = list(type = "probit")),
     list(label = "inner MC, M = 1e3", note = NULL, spec = list(type = "mc", M = 1e3)),
     list(label = "inner MC, M = 1e4", note = NULL, spec = list(type = "mc", M = 1e4))
 )
@@ -537,24 +593,121 @@ cat("=========================================================================\n
 cat("Summary table  (bias_vs_hat = QB estimate - NIE_hat)\n\n")
 print(summary_df, digits = 5L, row.names = FALSE)
 
+## ---------------------------------------------------------------------------
+## Part 3: the NIE on the odds-ratio scale against the rare-outcome closed form
+## ---------------------------------------------------------------------------
+
+cat("\nPart 3: the NIE odds ratio against the rare-outcome closed form\n")
+cat("=========================================================================\n")
+cat("  Valeri and VanderWeele (2013): OR_NIE = exp{(theta_M + theta_TM) gamma_T},\n")
+cat("  derived under a rare outcome and free of theta_0. Exact OR_NIE =\n")
+cat("  odds(E[Y(1, M(1))]) / odds(E[Y(1, M(0))]), by the reference quadrature.\n\n")
+
+## (a) At the true coefficients, across the intercept. The closed form is one
+## number, since it does not depend on theta_0.
+sweep_row <- function(theta_0) {
+    p <- potential_means_via_reference(
+        theta_0, common_pars[["theta_T"]], common_pars[["theta_M"]],
+        common_pars[["theta_TM"]], common_pars[["theta_C"]],
+        common_pars[["gamma_0"]], common_pars[["gamma_T"]],
+        common_pars[["gamma_C"]], common_pars[["sigma_M"]]
+    )
+    or_exact <- odds(p[["Y_11"]]) / odds(p[["Y_10"]])
+    or_rare  <- exp((common_pars[["theta_M"]] + common_pars[["theta_TM"]]) *
+                        common_pars[["gamma_T"]])
+    data.frame(
+        theta_0      = theta_0,
+        P_Y11        = p[["Y_11"]],
+        P_Y10        = p[["Y_10"]],
+        OR_exact     = or_exact,
+        OR_rare_form = or_rare,
+        ratio        = or_rare / or_exact
+    )
+}
+cat("  (a) True coefficients, by intercept (v = 2.56 throughout):\n\n")
+sweep_df <- Map(sweep_row, c(-9, -7.5, -6, -4.5, -3, -1, 0)) |> Reduce(rbind, x = _)
+print(sweep_df, digits = 5L, row.names = FALSE)
+
+## (b) Across the strength of the mediator. The two mediator coefficients of
+## the outcome model are scaled by a common factor, which moves v and the
+## closed form together, and the intercept is solved so that the outcome
+## probability with the mediator at its control law, E[Y(1, M(0))], takes a
+## stated value. Each cell is the closed form divided by the exact odds ratio.
+baseline_risks <- c(0.01, 0.05, 0.10, 0.25, 0.50)
+grid_cell <- function(beta_M, risk) {
+    v      <- beta_M^2 * common_pars[["sigma_M"]]^2
+    eta_10 <- uniroot(function(e) reference_integral(e, v) - risk, c(-40, 40),
+                      tol = 1e-13)[["root"]]
+    p_11   <- reference_integral(eta_10 + beta_M * common_pars[["gamma_T"]], v)
+    exp(beta_M * common_pars[["gamma_T"]]) / (odds(p_11) / odds(risk))
+}
+grid_row <- function(scale) {
+    beta_M <- scale * (common_pars[["theta_M"]] + common_pars[["theta_TM"]])
+    ratios <- mapply(function(risk) grid_cell(beta_M, risk), baseline_risks)
+    data.frame(
+        scale        = scale,
+        v            = beta_M^2 * common_pars[["sigma_M"]]^2,
+        OR_rare_form = exp(beta_M * common_pars[["gamma_T"]])
+    ) |> cbind(`names<-`(as.list(ratios), sprintf("risk_%.2f", baseline_risks)))
+}
+cat("\n  (b) Closed form over exact odds ratio, by mediator strength (rows) and\n")
+cat("      by E[Y(1, M(0))] (columns):\n\n")
+grid_df <- Map(grid_row, c(0.125, 0.25, 0.5, 0.75, 1)) |> Reduce(rbind, x = _)
+print(grid_df, digits = 5L, row.names = FALSE)
+
+## (c) On the three fitted data sets, with quasi-Bayesian intervals off the
+## draws of Part 2 (N_qb = 10^4, the same seed). The mixture gives the exact
+## odds ratio at each draw, and the closed form is evaluated at the same draw.
+or_row <- function(fit) {
+    args <- qb_arguments(fit, 10000L, seed = 7L)
+    mix  <- function(eta) LogisNormIntegral::logistic_normal_integral(eta, args[["v_both"]], K = 22L)
+    or_mix  <- odds(mix(args[["eta_11"]])) / odds(mix(args[["eta_10"]]))
+    or_rare <- exp(args[["beta_M"]] * args[["gamma_T"]])
+    ci <- function(x) unname(quantile(x, c(0.025, 0.975)))
+    data.frame(
+        scenario      = fit[["scenario"]],
+        OR_pop        = fit[["OR_pop"]],
+        OR_hat        = fit[["OR_hat"]],
+        mix_lo        = ci(or_mix)[1L],
+        mix_hi        = ci(or_mix)[2L],
+        rare_form_hat = fit[["OR_rare_hat"]],
+        rare_lo       = ci(or_rare)[1L],
+        rare_hi       = ci(or_rare)[2L],
+        rare_over_hat = fit[["OR_rare_hat"]] / fit[["OR_hat"]]
+    )
+}
+cat("\n  (c) Fitted data sets (n = 500), 95% quasi-Bayesian intervals:\n\n")
+or_df <- Map(or_row, fits) |> Reduce(rbind, x = _)
+print(or_df, digits = 5L, row.names = FALSE)
+
 cat("\nNotes:\n")
 cat("  - All methods estimate NIE_hat (the data-conditional posterior target).\n")
 cat("  - 'bias_vs_hat' = QB posterior mean - NIE_hat.\n")
 cat("      * Minimax K = 22, 17, 11: inner-integral error is bounded by each\n")
 cat("        Delta_K^* (3.6e-15 to 1.3e-11), invisible against QB outer noise.\n")
-cat("      * V&VW: O(v^2) Taylor bias that does not vanish with N_qb.\n")
 cat("      * Inner MC: O(sigma_Lambda / sqrt(M_inner)) noise per draw, which\n")
 cat("        averages out as N_qb -> infty but inflates CI width at small M_inner.\n")
 cat("  - All three minimax variants (K = 22, 17, 11) agree to >= 10 decimals\n")
 cat("    everywhere, so the cert hierarchy is below QB sampling resolution.\n")
-cat("  - The V&VW Taylor bias is regime-dependent, flipping sign from negative\n")
-cat("    at low prevalence to positive at moderate and high, and largest in\n")
-cat("    magnitude at high outcome prevalence.\n")
-cat("  - For interactive use with N_qb >= 10^4 outer draws, the certified\n")
-cat("    minimax mixture is the only practical choice. It is as fast as V&VW\n")
-cat("    but unbiased, and more than 380x faster than inner MC at M_inner = 10^4.\n")
+cat("  - The rare-outcome closed form does not depend on the intercept, so it\n")
+cat("    returns one odds ratio at every prevalence. The exact odds ratio falls\n")
+cat("    as the outcome becomes common, and the closed form overstates it.\n")
+cat("  - The overstatement shrinks with the strength of the mediator. At\n")
+cat("    v = 0.16 it stays within 2.2 per cent at every outcome probability\n")
+cat("    of the grid, against a factor of about two at v = 2.56.\n")
+cat("  - The certified mixture is more than 380x faster than inner MC at\n")
+cat("    M_inner = 10^4.\n")
+## The ratio of the inner Monte Carlo time to the mixture time at N_qb = 10^4,
+## one for each scenario, read from the rows timed above.
+mc_ratio <- function(scn) {
+    at   <- summary_df[["scenario"]] == scn & summary_df[["N_qb"]] == 10000L
+    time <- function(label) summary_df[["time_s"]][at & summary_df[["method"]] == label]
+    time("inner MC, M = 1e4") / time("minimax K=22 (default)")
+}
+mc_ratios <- mapply(mc_ratio, unique(summary_df[["scenario"]]))
 cat("    That figure is a floor against the K = 22 default, this script's\n")
-cat("    timing reference. The measured ratios in this run are 597x, 478x,\n")
-cat("    and 399x, so quote the floor as a floor.\n")
+cat(sprintf("    timing reference. The measured ratios in this run are %.0fx, %.0fx,\n",
+            mc_ratios[[1L]], mc_ratios[[2L]]))
+cat(sprintf("    and %.0fx, so quote the floor as a floor.\n", mc_ratios[[3L]]))
 
 invisible(summary_df)

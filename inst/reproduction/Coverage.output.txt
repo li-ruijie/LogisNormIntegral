@@ -2,43 +2,46 @@ Repeated-sampling coverage of nominal 95% quasi-Bayesian NIE intervals
 =========================================================================
   n = 500 per data set, N_sim = 2000 data sets, R_qb = 4000 outer draws.
   Target = fixed population NIE (true coefficients), contrast z = 1,
-  z' : 0 -> 1, covariate c = 0. Inner integral: certified minimax K = 11
-  vs Valeri--VanderWeele 2nd-order Taylor, off identical outer draws.
+  z' : 0 -> 1, covariate c = 0. Inner integral: certified minimax K = 11.
+  The NIE odds ratio is covered by the mixture and by the rare-outcome
+  closed form of Valeri and VanderWeele, off identical outer draws.
 
---- Scenario: low      (theta_0 = -3.0)  population NIE = +0.38941 ---
+--- Scenario: low      (theta_0 = -3.0)  population NIE = +0.38941, NIE odds ratio = 5.2688 ---
     replicates used: 2000 / 2000   mean P(Y=1) = 0.396
-    minimax K=11 : coverage =  95.8% (SE 0.5)   mean width = 0.1286
-    V&VW Taylor  : coverage =   4.9% (SE 0.5)   mean width = 0.1246
+    NIE, minimax K=11            : coverage =  95.8% (SE 0.5)   mean width = 0.1286
+    odds ratio, minimax K=11     : coverage =  95.8% (SE 0.4)
+    odds ratio, rare-outcome form: coverage =  39.6% (SE 1.1)
 
---- Scenario: moderate (theta_0 = -1.0)  population NIE = +0.30464 ---
+--- Scenario: moderate (theta_0 = -1.0)  population NIE = +0.30464, NIE odds ratio = 5.7162 ---
     replicates used: 2000 / 2000   mean P(Y=1) = 0.669
-    minimax K=11 : coverage =  95.7% (SE 0.5)   mean width = 0.1821
-    V&VW Taylor  : coverage =  99.2% (SE 0.2)   mean width = 0.2084
+    NIE, minimax K=11            : coverage =  95.7% (SE 0.5)   mean width = 0.1821
+    odds ratio, minimax K=11     : coverage =  95.8% (SE 0.4)
+    odds ratio, rare-outcome form: coverage =  70.4% (SE 1.0)
 
---- Scenario: high     (theta_0 = +0.0)  population NIE = +0.20856 ---
+--- Scenario: high     (theta_0 = +0.0)  population NIE = +0.20856, NIE odds ratio = 6.4067 ---
     replicates used: 2000 / 2000   mean P(Y=1) = 0.793
-    minimax K=11 : coverage =  95.2% (SE 0.5)   mean width = 0.1982
-    V&VW Taylor  : coverage =  92.2% (SE 0.6)   mean width = 0.3606
+    NIE, minimax K=11            : coverage =  95.2% (SE 0.5)   mean width = 0.1982
+    odds ratio, minimax K=11     : coverage =  95.2% (SE 0.5)
+    odds ratio, rare-outcome form: coverage =  87.8% (SE 0.7)
 
 =========================================================================
 Summary table
 
- scenario theta_0    py1 nie_pop n_used cov_mix   se_mix cov_vvw   se_vvw
-      low      -3 0.3958  0.3894   2000  0.9575 0.004511  0.0490 0.004827
- moderate      -1 0.6694  0.3046   2000  0.9565 0.004561  0.9920 0.001992
-     high       0 0.7932  0.2086   2000  0.9515 0.004804  0.9225 0.005979
- width_mix width_vvw
-    0.1286    0.1246
-    0.1821    0.2084
-    0.1982    0.3606
+ scenario theta_0    py1 nie_pop n_used or_pop cov_mix   se_mix width_mix
+      low      -3 0.3958  0.3894   2000  5.269  0.9575 0.004511    0.1286
+ moderate      -1 0.6694  0.3046   2000  5.716  0.9565 0.004561    0.1821
+     high       0 0.7932  0.2086   2000  6.407  0.9515 0.004804    0.1982
+ cov_or_mix cov_or_rare se_or_rare
+      0.958      0.3965   0.010938
+      0.958      0.7040   0.010207
+      0.952      0.8780   0.007318
 
 Notes:
   - Coverage is the fraction of the N_sim intervals containing the fixed
     population NIE. SE is the binomial Monte Carlo error sqrt(p(1-p)/N).
   - The minimax QB interval propagates full parameter uncertainty through
     the exact nonlinear map, so coverage tracks the nominal 95% level.
-  - V&VW's O(v^2) Taylor bias shifts its intervals off the target. The
-    resulting mis-coverage flips direction with outcome prevalence (severe
-    under-coverage at low, over-coverage at moderate, and under-coverage at
-    high), matching the sign-flipping bias in Example1.R and the manuscript
-    method-comparison table.
+  - The rare-outcome closed form estimates exp{(theta_M + theta_TM) gamma_T},
+    which equals the NIE odds ratio only in the rare-outcome limit. None of
+    the three regimes is rare, so its intervals centre on a different
+    quantity and seldom cover the exact odds ratio.

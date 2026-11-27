@@ -36,9 +36,11 @@
 ##   2. fit the outcome (logistic, with treat:mediator interaction) and
 ##      mediator (linear) models by maximum likelihood,
 ##   3. build the 95% QB interval for the NIE (R_qb outer parameter draws,
-##      inner integral by the certified mixture and, for contrast, by the
-##      Valeri--VanderWeele second-order Taylor expansion),
-##   4. record whether each interval covers the population NIE.
+##      inner integral by the certified mixture), and the 95% QB intervals
+##      for the NIE odds ratio, by the mixture and by the rare-outcome closed
+##      form of Valeri and VanderWeele (2013), exp{(theta_M + theta_TM) gamma_T},
+##   4. record whether each interval covers its population value, the NIE
+##      or the exact NIE odds ratio.
 ## Empirical coverage over N_sim replicates, with its binomial Monte Carlo
 ## standard error, is reported per regime and method.
 ##
@@ -107,11 +109,7 @@ inner_mixture <- function(eta, v) {
     z <- outer(eta, mix_s, "*") / sqrt(1 + outer(v, mix_s^2, "*"))
     as.numeric(pnorm(z) %*% mix_w)
 }
-inner_vvw <- function(eta, v) {
-    p    <- plogis(eta)
-    lam2 <- p * (1 - p) * (1 - 2 * p)
-    p + 0.5 * v * lam2
-}
+odds <- function(p) p / (1 - p)
 
 ## ---------------------------------------------------------------------------
 ## Data-generating process (identical to Example1.R)
@@ -133,7 +131,9 @@ scenarios <- list(
 ## Population NIE at the true coefficients: contrast z = 1, z' : 0 -> 1, c = 0.
 ## High-accuracy adaptive Gauss--Kronrod (`integrate`), the fixed estimand a
 ## frequentist interval must cover.
-nie_population <- function(theta_0) {
+## The two population potential-outcome means, from which the NIE and the NIE
+## odds ratio both follow.
+means_population <- function(theta_0) {
     b      <- common_pars[["theta_M"]] + common_pars[["theta_TM"]] * 1
     a1     <- theta_0 + common_pars[["theta_T"]] * 1
     mu_M1  <- common_pars[["gamma_0"]] + common_pars[["gamma_T"]] * 1
@@ -143,7 +143,7 @@ nie_population <- function(theta_0) {
         integrate(function(x) plogis(eta + sqrt(v) * x) * dnorm(x),
                   -Inf, Inf, rel.tol = 1e-12)[["value"]]
     }
-    I_ref(a1 + b * mu_M1) - I_ref(a1 + b * mu_M0)
+    c(Y_11 = I_ref(a1 + b * mu_M1), Y_10 = I_ref(a1 + b * mu_M0))
 }
 
 ## One synthetic data set, fitted by ML. Returns the coefficient bundle the QB
@@ -198,12 +198,15 @@ qb_intervals <- function(fit, seed) {
     eta_10  <- alpha_1 + beta_M * mu_M0
     v_both  <- beta_M^2 * sigma_sq
 
-    ci_of <- function(inner) {
-        yy  <- inner(c(eta_11, eta_10), c(v_both, v_both))
-        nie <- yy[seq_len(R_qb)] - yy[R_qb + seq_len(R_qb)]
-        unname(quantile(nie, c(0.025, 0.975)))
-    }
-    list(mixture = ci_of(inner_mixture), vvw = ci_of(inner_vvw))
+    yy   <- inner_mixture(c(eta_11, eta_10), c(v_both, v_both))
+    y_11 <- yy[seq_len(R_qb)]
+    y_10 <- yy[R_qb + seq_len(R_qb)]
+    ci   <- function(x) unname(quantile(x, c(0.025, 0.975)))
+    list(
+        mixture    = ci(y_11 - y_10),
+        or_mixture = ci(odds(y_11) / odds(y_10)),
+        or_rare    = ci(exp(beta_M * gamma_draws[, "treat"]))
+    )
 }
 
 covers <- function(ci, target) target >= ci[1] && target <= ci[2]
@@ -217,9 +220,11 @@ data_seeds <- sample.int(.Machine[["integer.max"]], N_sim)
 qb_seeds   <- sample.int(.Machine[["integer.max"]], N_sim)
 
 run_scenario <- function(scn) {
-    target <- nie_population(scn[["theta_0"]])
-    cat(sprintf("--- Scenario: %-8s (theta_0 = %+.1f)  population NIE = %+.5f ---\n",
-                scn[["name"]], scn[["theta_0"]], target))
+    pop       <- means_population(scn[["theta_0"]])
+    target    <- pop[["Y_11"]] - pop[["Y_10"]]
+    target_or <- odds(pop[["Y_11"]]) / odds(pop[["Y_10"]])
+    cat(sprintf("--- Scenario: %-8s (theta_0 = %+.1f)  population NIE = %+.5f, NIE odds ratio = %.4f ---\n",
+                scn[["name"]], scn[["theta_0"]], target, target_or))
 
     one_rep <- function(ds, qs) {
         fit <- simulate_and_fit(scn[["theta_0"]], ds)
@@ -227,10 +232,10 @@ run_scenario <- function(scn) {
         ci <- qb_intervals(fit, qs)
         list(
             py1     = fit[["py1"]],
-            cov_mix = covers(ci[["mixture"]], target),
-            cov_vvw = covers(ci[["vvw"]], target),
-            w_mix   = ci[["mixture"]][2] - ci[["mixture"]][1],
-            w_vvw   = ci[["vvw"]][2] - ci[["vvw"]][1]
+            cov_mix     = covers(ci[["mixture"]], target),
+            cov_or_mix  = covers(ci[["or_mixture"]], target_or),
+            cov_or_rare = covers(ci[["or_rare"]], target_or),
+            w_mix       = ci[["mixture"]][2] - ci[["mixture"]][1]
         )
     }
 
@@ -239,16 +244,19 @@ run_scenario <- function(scn) {
     n_ok  <- length(ok)
     pick  <- function(field) vapply(ok, function(r) r[[field]], numeric(1L))
 
-    cov_mix <- mean(pick("cov_mix"))
-    cov_vvw <- mean(pick("cov_vvw"))
+    cov_mix     <- mean(pick("cov_mix"))
+    cov_or_mix  <- mean(pick("cov_or_mix"))
+    cov_or_rare <- mean(pick("cov_or_rare"))
     se      <- function(p) sqrt(p * (1 - p) / n_ok)
 
     cat(sprintf("    replicates used: %d / %d   mean P(Y=1) = %.3f\n",
                 n_ok, N_sim, mean(pick("py1"))))
-    cat(sprintf("    minimax K=11 : coverage = %5.1f%% (SE %.1f)   mean width = %.4f\n",
+    cat(sprintf("    NIE, minimax K=11            : coverage = %5.1f%% (SE %.1f)   mean width = %.4f\n",
                 100 * cov_mix, 100 * se(cov_mix), mean(pick("w_mix"))))
-    cat(sprintf("    V&VW Taylor  : coverage = %5.1f%% (SE %.1f)   mean width = %.4f\n\n",
-                100 * cov_vvw, 100 * se(cov_vvw), mean(pick("w_vvw"))))
+    cat(sprintf("    odds ratio, minimax K=11     : coverage = %5.1f%% (SE %.1f)\n",
+                100 * cov_or_mix, 100 * se(cov_or_mix)))
+    cat(sprintf("    odds ratio, rare-outcome form: coverage = %5.1f%% (SE %.1f)\n\n",
+                100 * cov_or_rare, 100 * se(cov_or_rare)))
 
     data.frame(
         scenario   = scn[["name"]],
@@ -256,12 +264,13 @@ run_scenario <- function(scn) {
         py1        = mean(pick("py1")),
         nie_pop    = target,
         n_used     = n_ok,
-        cov_mix    = cov_mix,
-        se_mix     = se(cov_mix),
-        cov_vvw    = cov_vvw,
-        se_vvw     = se(cov_vvw),
-        width_mix  = mean(pick("w_mix")),
-        width_vvw  = mean(pick("w_vvw"))
+        or_pop      = target_or,
+        cov_mix     = cov_mix,
+        se_mix      = se(cov_mix),
+        width_mix   = mean(pick("w_mix")),
+        cov_or_mix  = cov_or_mix,
+        cov_or_rare = cov_or_rare,
+        se_or_rare  = se(cov_or_rare)
     )
 }
 
@@ -270,8 +279,9 @@ cat("=========================================================================\n
 cat(sprintf("  n = %d per data set, N_sim = %d data sets, R_qb = %d outer draws.\n",
             n, N_sim, R_qb))
 cat("  Target = fixed population NIE (true coefficients), contrast z = 1,\n")
-cat("  z' : 0 -> 1, covariate c = 0. Inner integral: certified minimax K = 11\n")
-cat("  vs Valeri--VanderWeele 2nd-order Taylor, off identical outer draws.\n\n")
+cat("  z' : 0 -> 1, covariate c = 0. Inner integral: certified minimax K = 11.\n")
+cat("  The NIE odds ratio is covered by the mixture and by the rare-outcome\n")
+cat("  closed form of Valeri and VanderWeele, off identical outer draws.\n\n")
 
 summary_df <- Map(run_scenario, scenarios) |> Reduce(rbind, x = _)
 
@@ -284,10 +294,9 @@ cat("  - Coverage is the fraction of the N_sim intervals containing the fixed\n"
 cat("    population NIE. SE is the binomial Monte Carlo error sqrt(p(1-p)/N).\n")
 cat("  - The minimax QB interval propagates full parameter uncertainty through\n")
 cat("    the exact nonlinear map, so coverage tracks the nominal 95% level.\n")
-cat("  - V&VW's O(v^2) Taylor bias shifts its intervals off the target. The\n")
-cat("    resulting mis-coverage flips direction with outcome prevalence (severe\n")
-cat("    under-coverage at low, over-coverage at moderate, and under-coverage at\n")
-cat("    high), matching the sign-flipping bias in Example1.R and the manuscript\n")
-cat("    method-comparison table.\n")
+cat("  - The rare-outcome closed form estimates exp{(theta_M + theta_TM) gamma_T},\n")
+cat("    which equals the NIE odds ratio only in the rare-outcome limit. None of\n")
+cat("    the three regimes is rare, so its intervals centre on a different\n")
+cat("    quantity and seldom cover the exact odds ratio.\n")
 
 invisible(summary_df)

@@ -16,10 +16,15 @@ from the cert data shipped with the package.
   $K = 22$.
 - `Example1.R`: the application-section worked example and its method-comparison table, a quasi-Bayesian
   speed/bias/accuracy comparison of inner-integral methods (minimax at the
-  $K = 22$ default and at $K = 17$ and $K = 11$, V&VW Taylor, inner Monte
-  Carlo, and optionally Pirjol's pointwise Poisson evaluator at truncation
-  orders 10 and 30) across three outcome-prevalence regimes, against an
-  adaptive-quadrature ground truth. Output: `Example1.output.txt`.
+  $K = 22$ default and at $K = 17$ and $K = 11$, a 30-node Gauss-Hermite rule,
+  the one-term probit approximation of Gaynor, Schwartz, and Lin (2019), inner
+  Monte Carlo, and optionally Pirjol's pointwise Poisson evaluator at truncation orders 10
+  and 30) across three outcome-prevalence regimes, against an
+  adaptive-quadrature ground truth. Its third part compares the indirect
+  effect on the odds-ratio scale with the rare-outcome closed form of Valeri
+  and VanderWeele (2013), at the true coefficients across the intercept,
+  across the strength of the mediator, and on the three fitted data sets.
+  Output: `Example1.output.txt`.
   The Pirjol rows need the upstream sources, which are third-party and not
   shipped. Clone them and pass the R directory to include those rows:
   ```sh
@@ -31,9 +36,28 @@ from the cert data shipped with the package.
   request 1 in memory, so the upstream files are used unmodified on disk.
 - `Coverage.R`: the application-section repeated-sampling claim, frequentist coverage
   of the nominal 95% quasi-Bayesian NIE intervals over 2000 simulated data sets
-  per outcome-prevalence regime, for the certified minimax $K = 11$ mixture and,
-  off the same outer draws, the V&VW Taylor expansion. Output:
+  per outcome-prevalence regime, for the certified minimax $K = 11$ mixture. Off
+  the same outer draws it also reports how often intervals for the odds ratio of
+  the indirect effect cover the exact value, by the mixture and by the
+  rare-outcome closed form of Valeri and VanderWeele (2013). Output:
   `Coverage.output.txt`.
+- `PublicData.R`: the odds ratio of the natural indirect effect on the Western
+  Collaborative Group Study (from the CRAN package `faraway`), exact by the certified
+  $K = 22$ mixture against the rare-outcome closed form of Valeri and VanderWeele
+  (2013). Body-mass index and blood pressure are states rather than interventions,
+  measured at the same visit, so the script evaluates the mediation formula at the
+  fitted models and offers no causal reading of the data. Output:
+  `PublicData.output.txt`.
+- `Quadrature.R`: the error of each evaluator against the variance argument $v$, the
+  largest error over 801 values of $\eta$ in $[-10, 10]$ of Gauss-Hermite rules with 10
+  to 100 nodes, of two one-term approximations, and of the certified mixtures at
+  $K = 8$, 11, and 22, with the smallest rule that matches the $K = 11$ bound at each
+  $v$ and the time of each evaluator. Output: `Quadrature.output.txt`.
+- `RandomIntercept.R`: population-averaged probabilities of random-intercept logistic
+  models fitted to five public clustered data sets (from the CRAN packages `HSAUR3`,
+  `geepack`, `MASS`, and `mlmRev`), where $v$ is the fitted variance of the intercept,
+  by each evaluator, with the difference between the arms of the toenail trial.
+  Output: `RandomIntercept.output.txt`.
 - `PirjolTiming.R`: the application-section pointwise comparison. Per-point accuracy and
   per-call cost of the corrected Pirjol (2013) Poisson evaluator at truncation
   orders 30 and 10 against adaptive Gauss-Kronrod reference values, and of the
@@ -49,6 +73,9 @@ Rscript Table1.R
 Rscript Frontier.R
 Rscript Example1.R
 Rscript Coverage.R
+Rscript PublicData.R
+Rscript Quadrature.R
+Rscript RandomIntercept.R
 ```
 
 `PirjolTiming.R` additionally needs a clone of the upstream
@@ -70,7 +97,8 @@ Or directly from a clone without installing:
 Rscript -e 'devtools::load_all("../.."); source("Table1.R")'
 ```
 
-`Table1.R`, `Frontier.R`, `Example1.R`, and `Coverage.R` all support the same
+`Table1.R`, `Frontier.R`, `Example1.R`, `Coverage.R`, `PublicData.R`, `Quadrature.R`, and
+`RandomIntercept.R` all support the same
 two paths to the package, the installed `LogisNormIntegral` or
 `devtools::load_all` from a clone, and stop with the same message when neither
 is available. Devtools is therefore needed only for the clone path. `Table1.R`,
@@ -87,11 +115,14 @@ The package depends only on base R (>= 3.5.0). `Table1.R`, `Frontier.R`, and
 `Coverage.R` use only base R and `LogisNormIntegral`. `Example1.R` additionally
 needs `statmod` (Gauss-Hermite cross-check of the ground-truth integral), and
 optionally the cloned upstream `logisticNormal` sources for its pointwise rows.
+`PublicData.R` needs the CRAN package `faraway`, which it reads for its data
+alone. `Quadrature.R` needs `statmod`, and `RandomIntercept.R` needs
+`lme4` and `statmod`, with `HSAUR3`, `geepack`, `MASS`, and `mlmRev` for their data.
 `PirjolTiming.R` uses base R, the shipped $K = 11$ certificate, and the cloned
-upstream sources named above. Running the four package-using scripts from a
+upstream sources named above. Running the seven package-using scripts from a
 clone rather than against an installed package also needs `devtools`. The
-multivariate-normal parameter draws are made with base `chol()`, so no `MASS`
-dependency remains anywhere in the package.
+multivariate-normal parameter draws are made with base `chol()`, so `MASS` is
+needed only by `RandomIntercept.R`, which reads one data set from it.
 
 ## Expected output
 
@@ -109,8 +140,13 @@ bound plus fp64 evaluation noise).
 `Example1.R` prints a pointwise-accuracy table (K = 8/11/17 vs Monte Carlo) and a
 quasi-Bayesian NIE comparison across three outcome-prevalence regimes. The minimax
 $K = 11$ NIE is ~0.41 / 0.32 / 0.24 (low / moderate / high) and agrees with $K = 17$
-to >= 10 decimals (the cert hierarchy is below QB sampling resolution), while V&VW
-Taylor is biased by -13 / +9 / +25 pp. When the Pirjol engine is enabled it
+to >= 10 decimals (the cert hierarchy is below QB sampling resolution). The third
+part prints the odds ratio of the indirect effect, exact against the rare-outcome
+closed form of Valeri and VanderWeele, which returns 11.02 at the true coefficients
+where the exact value runs from 9.85 to 5.27. Those coefficients give $v = 2.56$. With
+the mediator coefficients scaled down, the ratio of the closed form to the exact value
+is at most 1.022 at $v = 0.16$ and at most 1.151 at $v = 0.64$ over outcome
+probabilities from 0.01 to 0.50. When the Pirjol engine is enabled it
 reproduces the mixture to all six printed decimals in the low and moderate
 regimes, and is undefined on 3 of 10000 draws at order 10 and 4 at order 30 in
 the high regime. That evaluator returns a non-finite value at both ends of its
@@ -127,10 +163,31 @@ failed. Those draws are dropped and the count is printed. Needs `statmod`.
 
 `Coverage.R` prints a 3-row coverage table. The certified minimax $K = 11$ QB
 interval covers the fixed population NIE at close to the nominal 95% in all three
-regimes (95.8 / 95.7 / 95.2%, low / moderate / high, as captured), while the V&VW
-Taylor coverage is 4.9 / 99.2 / 92.2% off the same outer draws. Since the draws
+regimes (95.8 / 95.7 / 95.2%, low / moderate / high, as captured). For the odds
+ratio of the indirect effect the mixture intervals cover the exact value in 95.8 /
+95.8 / 95.2% of replicates and those of the rare-outcome closed form in 39.6 / 70.4 /
+87.8%, off the same outer draws. Since the draws
 are formed from a Cholesky factor the percentages reproduce across BLAS builds
 (see the platform note in `Example1.R`). Runs in about 80 s.
+
+`PublicData.R` prints one row. In the Western Collaborative Group Study ($n = 3154$,
+8.1% with the event, $v = 0.03$) the closed form gives 1.0826 where the exact odds
+ratio has geometric mean 1.0824 over the participants and lies between 1.0819 and
+1.0825. The mixture agrees with adaptive quadrature to 1.6e-15 on every
+potential-outcome mean. Runs in a few seconds.
+
+`Quadrature.R` prints the error table, the node counts, and the timings. A rule of
+30 nodes errs by 3.7e-13 at $v = 1$, by 2.3e-7 at $v = 4$, and by 2.9e-4 at $v = 16$,
+and matching the $K = 11$ bound takes 25 nodes at $v = 1$, 75 at $v = 4$, and 270 at
+$v = 16$. The certified mixtures hold their bounds at every $v$. Runs in about two
+minutes.
+
+`RandomIntercept.R` prints one row for each data set and the toenail contrast. The
+fitted intercept variance runs from 0.23 (Contraception) to 16.1 (toenail). In the
+toenail trial a 30-node rule errs by 2.6e-4 and a 100-node rule by 2.3e-7, and the
+difference between the arms at month 6 is off by 2.5% with 20 nodes and by 8.3%
+with the attenuation formula of Zeger, Liang, and Albert (1988). Runs in about a
+minute.
 
 `PirjolTiming.R` prints an eight-row per-point table and a per-call cost
 summary. In the captured output the corrected Poisson evaluator at order 30

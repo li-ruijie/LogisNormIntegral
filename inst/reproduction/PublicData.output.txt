@@ -1,0 +1,13 @@
+The odds ratio of the natural indirect effect on a public data set
+=========================================================================
+  Exact: the certified K = 22 mixture, conditional on the covariates of each
+  individual. Closed form: Valeri and VanderWeele (2013), rare outcome.
+
+ data    n prevalence v_exposed v_unexposed OR_rare_form OR_exact_mean OR_exact_min OR_exact_max rare_over_exact mixture_abs_err
+ WCGS 3154   0.081484  0.032214     0.18707       1.0826        1.0824       1.0819       1.0825          1.0002        1.53e-15
+
+Notes:
+  - v is the squared log odds ratio of the outcome for one residual standard
+    deviation of the mediator, (theta_M + theta_TM z)^2 sigma_M^2.
+  - mixture_abs_err is the largest difference between the mixture and adaptive
+    quadrature over every potential-outcome mean evaluated.

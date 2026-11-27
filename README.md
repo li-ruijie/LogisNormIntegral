@@ -20,8 +20,9 @@ $$
 This integral has no exact closed form, so it is ordinarily evaluated by adaptive
 quadrature or by inner Monte Carlo sampling. Both are costly in computation time when the integral sits
 inside an outer loop over parameter draws, which is where applications place it. The
-inexpensive alternative in common use, a second-order Taylor expansion in $v$, carries a
-bias that does not vanish as the outer sample grows.
+inexpensive alternatives in common use, the rare-outcome formulas of causal mediation and
+the one-term probit approximation, carry an error that does not vanish as the outer
+sample grows.
 
 This package supplies a third route. A fixed K-term normal-scale mixture collapses the
 integral to a finite sum of normal distribution functions, evaluable in closed form, whose
@@ -52,10 +53,17 @@ quasi-Bayesian analysis evaluates one per outer draw. A certified mixture evalua
 replaces the inner quadrature or sampling, and its error is bounded by Delta_K\* rather
 than by a sampling rate. Against inner Monte Carlo at $M_{\rm inner} = 10^4$,
 `inst/reproduction/Example1.R` measures a floor of 380 times faster at the K = 22 default.
-The second-order Taylor expansion of Valeri and VanderWeele is comparable in speed and
-carries a bias at each of the three outcome prevalences that script tests, flipping sign
-across them and largest at high prevalence. `predict_indirect_effect_qb()` is the entry
-point, shown under Usage below.
+The closed form of Valeri and VanderWeele for the odds ratio of the indirect effect
+assumes a rare outcome and does not depend on the intercept of the outcome model. At the
+coefficients of that script it returns 11.02 at every prevalence, where the exact odds
+ratio is 9.85 when the two outcome probabilities are 0.2 and 1.9 per cent and lies
+between 5.27 and 6.41 at the three prevalences the script tests. Those coefficients
+describe a strong mediator, with $v = 2.56$. The same script scales the mediator down,
+and at $v = 0.16$ the closed form stays within 2.2 per cent of the exact odds ratio at
+every outcome probability it tests. On the Western Collaborative Group Study, where
+$v = 0.03$ and the outcome is rare, `PublicData.R` finds 1.0826 against an exact
+1.0824.
+`predict_indirect_effect_qb()` is the entry point, shown under Usage below.
 
 ## Installation
 
@@ -64,7 +72,7 @@ GitHub:
 
 ```r
 # install.packages("remotes")
-remotes::install_github("li-ruijie/LogisNormIntegral@v0.2.10")
+remotes::install_github("li-ruijie/LogisNormIntegral@v0.2.11")
 ```
 
 Every [release](https://github.com/li-ruijie/LogisNormIntegral/releases) also carries a
@@ -72,7 +80,7 @@ pre-built source tarball, installable without any build tools:
 
 ```r
 install.packages(
-  "https://github.com/li-ruijie/LogisNormIntegral/releases/download/v0.2.10/LogisNormIntegral_0.2.10.tar.gz",
+  "https://github.com/li-ruijie/LogisNormIntegral/releases/download/v0.2.11/LogisNormIntegral_0.2.11.tar.gz",
   repos = NULL, type = "source")
 ```
 
@@ -167,6 +175,12 @@ and carries a verification snippet.
   relaxed BA at K = 14 to 17, and the signed K = 22 bound.
 - `Example1.R`: quasi-Bayesian inner-integral speed, bias, and accuracy comparison.
 - `Coverage.R`: repeated-sampling coverage of the quasi-Bayesian NIE intervals.
+- `Quadrature.R`: the error of Gauss-Hermite rules, of one-term approximations, and of
+  the certified mixtures against the variance argument, with their timings.
+- `RandomIntercept.R`: population-averaged probabilities of random-intercept logistic
+  models on five public clustered data sets, where the variance argument reaches 16.
+- `PublicData.R`: the odds ratio of the indirect effect on a public data set, exact
+  against the rare-outcome closed form (needs the package `faraway` for its data).
 - `PirjolTiming.R`: per-point accuracy and cost of the corrected Pirjol (2013)
   Poisson evaluator against the certified K = 11 mixture (needs a clone of the
   upstream `dan-pirjol/logisticNormal` package, see `inst/reproduction/README.md`).

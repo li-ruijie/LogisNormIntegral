@@ -1,0 +1,47 @@
+Population-averaged probabilities of random-intercept logistic models
+=========================================================================
+  v is the fitted variance of the random intercept. Each evaluator column is
+  the largest absolute error over the fixed-effect linear predictors of the
+  fit, against adaptive quadrature. The column 'reference' is the largest
+  difference between that quadrature and a 500-node Gauss-Hermite rule.
+
+          data    n clusters        v   eta_min  eta_max reference probit attenuated_logit   GH_10   GH_20   GH_30   GH_50  GH_100 mixture_K11 mixture_K22
+       toenail 1908      294 16.05322 -11.54329 -1.61833   1.6e-15 0.0040           0.0110 7.8e-03 1.2e-03 2.6e-04 2.1e-05 2.3e-07     8.5e-15     1.7e-16
+   respiratory  444      111  6.41184  -2.53003  3.38482   1.0e-15 0.0072           0.0110 1.3e-03 5.4e-05 4.5e-06 9.1e-08 6.6e-11     2.2e-16     3.3e-16
+          ohio 2148      537  4.68634  -3.27707 -2.35163   5.0e-16 0.0083           0.0091 2.1e-04 6.5e-06 3.7e-07 4.1e-09 8.5e-13     2.8e-17     8.3e-17
+      bacteria  220       50  1.70124   0.58323  3.57905   6.7e-16 0.0120           0.0083 6.9e-06 6.4e-09 1.2e-10 5.9e-14 4.4e-16     2.2e-16     3.3e-16
+ Contraception 1934       60  0.22909  -2.69124  0.57848   8.9e-16 0.0160           0.0022 1.2e-11 5.6e-16 6.7e-16 8.9e-16 5.6e-16     1.2e-13     2.2e-16
+
+Toenail trial (v = 16.053): terbinafine minus itraconazole, the difference in the
+population-averaged probability of moderate or severe onycholysis:
+
+                      month_0      month_3      month_6     month_12
+reference        -0.013572495 -0.040567809 -0.053170165 -0.042797358
+probit           -0.013757449 -0.040939579 -0.053260716 -0.041753435
+attenuated_logit -0.014092566 -0.039644580 -0.048759452 -0.037993013
+GH_10            -0.015358532 -0.041753883 -0.045589314 -0.045937305
+GH_20            -0.013959660 -0.039401729 -0.054501295 -0.043164731
+GH_30            -0.013606439 -0.040596742 -0.053029297 -0.042716219
+GH_50            -0.013562298 -0.040585763 -0.053189575 -0.042799864
+GH_100           -0.013572553 -0.040568042 -0.053170317 -0.042797257
+mixture_K11      -0.013572495 -0.040567809 -0.053170165 -0.042797358
+mixture_K22      -0.013572495 -0.040567809 -0.053170165 -0.042797358
+
+Population-averaged probabilities in the two arms, by the reference:
+
+             month_0 month_3 month_6 month_12
+itraconazole 0.35594 0.26212 0.18300 0.075392
+terbinafine  0.34237 0.22155 0.12983 0.032595
+
+Relative error of each contrast, in per cent:
+
+                 month_0 month_3 month_6 month_12
+probit             1.363   0.916   0.170   -2.439
+attenuated_logit   3.832  -2.276  -8.295  -11.226
+GH_10             13.159   2.924 -14.258    7.337
+GH_20              2.853  -2.874   2.504    0.858
+GH_30              0.250   0.071  -0.265   -0.190
+GH_50             -0.075   0.044   0.037    0.006
+GH_100             0.000   0.001   0.000    0.000
+mixture_K11        0.000   0.000   0.000    0.000
+mixture_K22        0.000   0.000   0.000    0.000

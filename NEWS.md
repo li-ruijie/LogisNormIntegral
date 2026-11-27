@@ -1,3 +1,3 @@
-# LogisNormIntegral 0.2.10
+# LogisNormIntegral 0.2.11
 
 * Initial public release.

@@ -1,6 +1,6 @@
 Package: LogisNormIntegral
 Title: Certified Minimax Approximation of the Logistic-Normal Integral
-Version: 0.2.10
+Version: 0.2.11
 Authors@R:
     person("Ruijie", "Li", , "ruijie@leefy.net",
            role = c("aut", "cre"))

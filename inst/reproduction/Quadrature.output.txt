@@ -1,0 +1,34 @@
+The error of each evaluator against the variance argument v
+=========================================================================
+  Largest absolute error over 801 values of eta in [-10, 10], against
+  adaptive quadrature. 'reference' is the largest difference between that
+  quadrature and a 500-node Gauss-Hermite rule.
+
+          v reference probit attenuated_logit   GH_10   GH_11   GH_20   GH_30   GH_50  GH_100 mixture_K8 mixture_K11 mixture_K22
+ [1,]  0.01   1.4e-15 0.0170          0.00011 4.4e-16 1.1e-15 7.8e-16 8.9e-16 1.0e-15 1.0e-15    2.1e-09     1.2e-11     3.6e-15
+ [2,]  0.10   1.3e-15 0.0170          0.00110 9.1e-15 1.6e-15 8.9e-16 8.9e-16 1.1e-15 1.0e-15    1.7e-09     8.4e-12     1.9e-15
+ [3,]  0.50   1.2e-15 0.0150          0.00420 4.9e-09 1.4e-09 9.5e-14 8.9e-16 1.0e-15 8.9e-16    7.4e-10     1.7e-12     5.6e-16
+ [4,]  1.00   1.3e-15 0.0130          0.00650 4.4e-07 1.8e-07 1.7e-10 3.7e-13 1.0e-15 8.9e-16    2.7e-10     4.0e-13     5.6e-16
+ [5,]  2.00   1.2e-15 0.0110          0.00890 1.7e-05 8.8e-06 6.1e-08 7.7e-10 7.1e-13 8.9e-16    4.2e-11     4.2e-14     5.6e-16
+ [6,]  4.00   1.1e-15 0.0089          0.01000 2.8e-04 1.8e-04 5.2e-06 2.3e-07 1.6e-09 1.7e-13    1.8e-11     4.6e-15     5.6e-16
+ [7,]  9.00   1.0e-15 0.0059          0.01100 3.1e-03 2.2e-03 2.1e-04 2.7e-05 9.7e-07 2.2e-09    1.3e-11     2.7e-15     4.4e-16
+ [8,] 16.00   1.7e-15 0.0040          0.01100 1.0e-02 7.9e-03 1.4e-03 2.9e-04 2.4e-05 2.5e-07    3.8e-11     8.3e-15     5.6e-16
+ [9,] 25.00   7.5e-13 0.0029          0.01000 2.0e-02 1.7e-02 4.0e-03 1.2e-03 1.6e-04 4.1e-06    9.4e-11     4.5e-14     5.6e-16
+
+Smallest Gauss-Hermite rule, in steps of 5 nodes, with error at most 1.26e-11:
+
+     v nodes
+  0.01     5
+  0.10    10
+  0.50    20
+  1.00    25
+  2.00    45
+  4.00    75
+  9.00   160
+ 16.00   270
+ 25.00    NA
+
+Seconds for one million evaluations (median of five):
+
+          probit attenuated_logit            GH_10            GH_11            GH_20            GH_30            GH_50           GH_100       mixture_K8      mixture_K11      mixture_K22 
+            0.02             0.01             0.08             0.09             0.16             0.24             0.40             0.81             0.21             0.31             0.61 
